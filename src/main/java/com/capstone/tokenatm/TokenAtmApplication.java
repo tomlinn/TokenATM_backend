@@ -9,5 +9,4 @@ public class TokenAtmApplication {
     public static void main(String[] args) {
         SpringApplication.run(TokenAtmApplication.class, args);
     }
-
 }
