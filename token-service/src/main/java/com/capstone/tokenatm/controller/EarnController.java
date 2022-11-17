@@ -97,4 +97,9 @@ public class EarnController {
             throw new InternalServerException();
         }
     }
+
+    @GetMapping(path="/spend/{user_id}/{assignment_id}/{cost}")
+    public @ResponseBody String spendToken(@PathVariable String user_id, @PathVariable String assignment_id, @PathVariable Integer cost) throws IOException {
+        return earnService.spendToken(user_id, assignment_id, cost);
+    }
 }

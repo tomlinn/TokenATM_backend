@@ -31,6 +31,8 @@ public interface EarnService {
 
     Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException;
 
+    String spendToken(String user_id, String assignment_id, Integer cost) throws IOException;
+
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
 }
 

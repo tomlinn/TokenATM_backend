@@ -1,5 +1,6 @@
 package com.capstone.tokenatm.service.impl;
 
+import com.capstone.tokenatm.entity.SpendLogEntity;
 import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
@@ -64,6 +65,9 @@ public class EarnServiceI implements EarnService {
 
     @Autowired
     private TokenRepository tokenRepository;
+
+    @Autowired
+    private LogRepository logRepository;
 
     //Token earning deadlines
     private static final List<Date> survey_deadlines = new ArrayList<>();
@@ -266,6 +270,22 @@ public class EarnServiceI implements EarnService {
             return response.body().string();
         }
     }
+    private Integer apiProcess(URL url, RequestBody body, Boolean isCanvas) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+        Request.Builder builder = new Request.Builder()
+                .url(url)
+                .addHeader("Content-Type", "application/json");
+        if (isCanvas) {
+            builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
+        } else {
+            builder.addHeader("X-API-TOKEN", API_KEY);
+        }
+        builder.method("POST",body);
+        Request request = builder.build();
+        try (Response response = client.newCall(request).execute()) {
+            return response.code();
+        }
+    }
 
     private Map<String, Student> getStudents() throws IOException, JSONException {
         int page = 1;
@@ -427,6 +447,53 @@ public class EarnServiceI implements EarnService {
             completedEmails.add(emailAddress);
         }
         return completedEmails;
+    }
+
+    public String spendToken(String user_id, String assignment_id, Integer cost) throws IOException {
+        Optional<TokenCountEntity> user_data = tokenRepository.findById(user_id);
+        Integer token_count = user_data.get().getToken_count();
+
+        if (token_count >= cost) {
+            Date current_time = new Date();
+            token_count = token_count - cost;
+            Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
+            TokenCountEntity entity = null;
+            entity = optional.get();
+            entity.setToken_count(token_count);
+            entity.setTimestamp(current_time);
+            tokenRepository.save(entity);
+
+            SpendLogEntity n = new SpendLogEntity();
+            n.setUser_id(Integer.valueOf(user_id));
+            n.setType("Spend");
+            n.setTokenCount(-cost);
+            n.setSourcee(assignment_id);
+            n.setTimestamp(current_time);
+            logRepository.save(n);
+
+            String title = "Resubmission";
+            Date due =  new Date(current_time.getTime() + 24*60*60*1000);
+
+            URL url = UriComponentsBuilder
+                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignment_id + "/overrides")
+                    .build().toUri().toURL();
+            RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                                                          .addFormDataPart("assignment_override[student_ids][]",user_id)
+                                                          .addFormDataPart("assignment_override[title]",title)
+                                                          .addFormDataPart("assignment_override[lock_at]",due.toString())
+                                                          .build();
+
+            switch (apiProcess(url, body, true)) {
+                case 201:
+                    return "success, resubmission just opened";
+                case 400:
+                    return "failed, resubmission may already be opened for this student.";
+                default:
+                    return "error";
+            }
+        }
+
+        return "failed, you don't have enough token";
     }
 
     private class ExportResponse {
