@@ -1,19 +1,22 @@
 package com.capstone.tokenatm.controller;
 
+import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.InternalServerException;
+import com.capstone.tokenatm.service.AssignmentStatus;
 import com.capstone.tokenatm.service.EarnService;
+import com.capstone.tokenatm.service.Student;
+import com.capstone.tokenatm.service.TokenRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 public class EarnController {
@@ -22,6 +25,21 @@ public class EarnController {
 
     @Autowired
     EarnService earnService;
+
+    @GetMapping(path="/assignment_status/{user_id}")
+    public @ResponseBody List<AssignmentStatus> getAssignmentStatuses(@PathVariable String user_id) throws JSONException, IOException {
+        return earnService.getAssignmentStatuses(user_id);
+    }
+
+    @GetMapping(path="/sync")
+    public @ResponseBody Iterable<TokenCountEntity> manualSync() throws JSONException, IOException {
+        return earnService.manualSyncTokens();
+    }
+
+    @GetMapping(path="/tokens/{user_id}")
+    public @ResponseBody Optional<TokenCountEntity> getTokenForStudent(@PathVariable String user_id) {
+        return earnService.getStudentTokenCount(user_id);
+    }
 
     //For testing if Qualtrics is working
     @GetMapping("/whoami")
@@ -36,31 +54,9 @@ public class EarnController {
     }
 
     @GetMapping("/survey_export")
-    public List<String> getSurveyExport(
+    public Set<String> getSurveyExport(
     ) throws InternalServerException {
         return earnService.getSurveyCompletions("SV_8oIf0qAz5g0TFiK");
-    }
-
-    @GetMapping("/sync")
-    public String sync(
-    ) throws InternalServerException {
-        try {
-            return earnService.sync();
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-            throw new InternalServerException();
-        }
-    }
-
-    @GetMapping("/users")
-    public ArrayList<HashMap<String, String>> users(
-    ) throws InternalServerException {
-        try {
-            return earnService.getUsers();
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-            throw new InternalServerException();
-        }
     }
 
     @GetMapping("/grades")
@@ -75,14 +71,9 @@ public class EarnController {
     }
 
     @GetMapping("/students")
-    public Map<String, Object> getStudent(
-    )  throws InternalServerException {
-        try {
-            return earnService.getStudent();
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-            throw new InternalServerException();
-        }
+    public Iterable<TokenCountEntity> getStudents(
+    ) {
+        return earnService.getAllStudentTokenCounts();
     }
 
     @GetMapping("/token_grades")
