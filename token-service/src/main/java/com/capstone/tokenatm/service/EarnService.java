@@ -34,5 +34,7 @@ public interface EarnService {
     String spendToken(String user_id, String assignment_id, Integer cost) throws IOException;
 
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
+
+    void updateToken(String studentID, Integer tokenNum);
 }
 

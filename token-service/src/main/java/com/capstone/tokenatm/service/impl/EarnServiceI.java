@@ -12,6 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONArray;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
@@ -619,4 +622,16 @@ public class EarnServiceI implements EarnService {
         String name = responseObj.getString("name");
         return new Assignment(assignmentId, name, dueAt, pointsPossible);
     }
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
+    @Override
+    public void updateToken(String studentID, Integer tokenNum) {
+        String sql = "update tokens set token_count="
+                + tokenNum.toString() + " where user_id="+studentID;
+        System.out.println(sql);
+        jdbcTemplate.execute(sql);
+    }
+
 }

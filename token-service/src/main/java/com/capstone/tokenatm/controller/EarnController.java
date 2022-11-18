@@ -10,10 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONException;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -101,5 +98,11 @@ public class EarnController {
     @GetMapping(path="/spend/{user_id}/{assignment_id}/{cost}")
     public @ResponseBody String spendToken(@PathVariable String user_id, @PathVariable String assignment_id, @PathVariable Integer cost) throws IOException {
         return earnService.spendToken(user_id, assignment_id, cost);
+    }
+
+    @PostMapping("/update")
+    public @ResponseBody String updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) {
+        earnService.updateToken(studentId, tokenNum);
+        return "ok";
     }
 }
