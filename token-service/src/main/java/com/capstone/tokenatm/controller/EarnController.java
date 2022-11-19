@@ -98,7 +98,7 @@ public class EarnController {
         }
     }
 
-    @GetMapping(path="/spend/{user_id}/{assignment_id}/{cost}")
+    @GetMapping(path="/use_token/{user_id}/{assignment_id}/{cost}")
     public @ResponseBody String spendToken(@PathVariable String user_id, @PathVariable String assignment_id, @PathVariable Integer cost) throws IOException {
         return earnService.spendToken(user_id, assignment_id, cost);
     }
