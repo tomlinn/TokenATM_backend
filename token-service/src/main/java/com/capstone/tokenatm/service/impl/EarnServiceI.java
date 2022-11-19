@@ -28,6 +28,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 @Service("EarnService")
 public class EarnServiceI implements EarnService {
@@ -599,7 +600,8 @@ public class EarnServiceI implements EarnService {
                     }
                     //Grades released
                     int tokens_required = (int) (assignment.getMaxPoints() - score);
-                    return new AssignmentStatus(assignment.getName(), assignment.getDueDate(), score, assignment.getMaxPoints(), "none", tokens_required);
+                    String status = StreamSupport.stream(logRepository.findByUserIdAssignmentId(Integer.valueOf(user_id), assignmentId).spliterator(), false).count() > 0 ? "requested" : "none";
+                    return new AssignmentStatus(assignment.getName(), assignment.getDueDate(), score, assignment.getMaxPoints(), status, tokens_required);
                 }
             }
             if (resultArray.length() < PER_PAGE)
