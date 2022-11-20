@@ -152,6 +152,7 @@ public class EarnServiceI implements EarnService {
     public Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException {
         init();
         syncModule();
+        syncLog();
         for (String surveyId : tokenSurveyIds) {
             syncSurvey(surveyId);
         }
@@ -213,6 +214,20 @@ public class EarnServiceI implements EarnService {
         }
     }
 
+    private void syncLog() {
+        try {
+            Map<String, Student> studentMap = getStudents();
+            Iterable<SpendLogEntity> logs = logRepository.findAll();
+            for (SpendLogEntity log : logs) {
+                String user_id = String.valueOf(log.getUserId());
+                Integer token_count = log.getTokenCount();
+                updateTokenEntity(studentMap, user_id, token_count);
+            }
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
     @Async
     @Override
     public void syncTokensOnDeadline() throws JSONException, IOException {
@@ -228,6 +243,8 @@ public class EarnServiceI implements EarnService {
             Date deadline = survey_deadlines.get(i);
             scheduler.schedule(() -> syncSurvey(surveyId), deadline);
         }
+
+        scheduler.schedule(() -> syncLog(), module_deadline);
     }
 
     @Override
