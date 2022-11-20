@@ -5,6 +5,7 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.*;
+import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,9 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONArray;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
@@ -22,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -134,7 +131,7 @@ public class EarnServiceI implements EarnService {
         return entity;
     }
 
-    private void updateTokenEntity(Map<String, Student> studentMap, String user_id, int add_count) {
+    private void updateTokenEntity(Map<String, Student> studentMap, String user_id, int add_count, String source) {
         Student student = studentMap.getOrDefault(user_id, null);
         if (student == null) {
             LOGGER.error("Error: Student " + user_id + " does not exist in enrollment list");
@@ -150,6 +147,19 @@ public class EarnServiceI implements EarnService {
             entity.setToken_count(add_count);
         }
         tokenRepository.save(entity);
+
+        //Generate token use log
+        logRepository.save(createLog(user_id, add_count >= 0 ? "earn" : "spend", add_count, source));
+    }
+
+    private SpendLogEntity createLog(String user_id, String type, Integer token_count, String source) {
+        SpendLogEntity n = new SpendLogEntity();
+        n.setUser_id(user_id);
+        n.setType(type);
+        n.setTokenCount(token_count);
+        n.setSourcee(source);
+        n.setTimestamp(new Date());
+        return n;
     }
 
     public Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException {
@@ -186,7 +196,7 @@ public class EarnServiceI implements EarnService {
         }
 
         for (String userId : usersToUpdate) {
-            updateTokenEntity(studentMap, userId, 1);
+            updateTokenEntity(studentMap, userId, 1, "Qualtrics Survey: " + surveyId);
         }
     }
 
@@ -212,7 +222,7 @@ public class EarnServiceI implements EarnService {
             }
 
             for (String user_id : usersToUpdate) {
-                updateTokenEntity(studentMap, user_id, 2);
+                updateTokenEntity(studentMap, user_id, 2, "Module 1");
             }
         }
     }
@@ -224,7 +234,9 @@ public class EarnServiceI implements EarnService {
             for (SpendLogEntity log : logs) {
                 String user_id = String.valueOf(log.getUserId());
                 Integer token_count = log.getTokenCount();
-                updateTokenEntity(studentMap, user_id, token_count);
+                if (log.getType().equals("spend")) {
+                    updateTokenEntity(studentMap, user_id, -token_count, log.getSource());
+                }
             }
         } catch (IOException | JSONException e) {
             e.printStackTrace();
@@ -246,8 +258,6 @@ public class EarnServiceI implements EarnService {
             Date deadline = survey_deadlines.get(i);
             scheduler.schedule(() -> syncSurvey(surveyId), deadline);
         }
-
-        scheduler.schedule(() -> syncLog(), module_deadline);
     }
 
     @Override
@@ -642,15 +652,17 @@ public class EarnServiceI implements EarnService {
         return new Assignment(assignmentId, name, dueAt, pointsPossible);
     }
 
-    @Autowired
-    JdbcTemplate jdbcTemplate;
-
     @Override
-    public void updateToken(String studentID, Integer tokenNum) {
-        String sql = "update tokens set token_count="
-                + tokenNum.toString() + " where user_id="+studentID;
-        System.out.println(sql);
-        jdbcTemplate.execute(sql);
+    public UpdateTokenResponse updateToken(String user_id, Integer tokenNum) {
+        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
+        if (optional.isPresent()) {
+            TokenCountEntity entity = optional.get();
+            entity.setToken_count(tokenNum);
+            return new UpdateTokenResponse("complete", tokenNum);
+        } else {
+            LOGGER.error("Error: Student " + user_id + " does not exist in database");
+            return new UpdateTokenResponse("failed", -1);
+        }
     }
 
 }

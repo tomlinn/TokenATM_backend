@@ -3,6 +3,7 @@ package com.capstone.tokenatm.service;
 import antlr.Token;
 import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.InternalServerException;
+import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -35,6 +36,6 @@ public interface EarnService {
 
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
 
-    void updateToken(String studentID, Integer tokenNum);
+    UpdateTokenResponse updateToken(String user_id, Integer tokenNum);
 }
 
