@@ -467,7 +467,7 @@ public class EarnServiceI implements EarnService {
             tokenRepository.save(entity);
 
             SpendLogEntity n = new SpendLogEntity();
-            n.setUser_id(Integer.valueOf(user_id));
+            n.setUser_id(user_id);
             n.setType("Spend");
             n.setTokenCount(-cost);
             n.setSourcee(assignment_id);

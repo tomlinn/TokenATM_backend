@@ -11,7 +11,7 @@ public class SpendLogEntity {
 	@GeneratedValue(strategy=GenerationType.AUTO)
 	private Integer id;
 
-	private Integer user_id;
+	private String user_id;
 
 	private String type;
 
@@ -21,7 +21,7 @@ public class SpendLogEntity {
 
 	private Date timestamp;
 
-	public Integer getUserId() {
+	public String getUserId() {
 		return user_id;
 	}
 	public Integer getId() {
@@ -32,7 +32,7 @@ public class SpendLogEntity {
 		this.id = id;
 	}
 
-	public void setUser_id(Integer user_id) {
+	public void setUser_id(String user_id) {
 		this.user_id = user_id;
 	}
 

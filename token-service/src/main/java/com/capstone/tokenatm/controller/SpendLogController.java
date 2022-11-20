@@ -16,7 +16,7 @@ public class SpendLogController {
     private LogRepository logRepository;
 
     @PostMapping(path="/add_log") // Map ONLY POST Requests
-    public @ResponseBody String addLog (@RequestParam Integer user_id, @RequestParam String type, @RequestParam Integer token_count, @RequestParam String source) {
+    public @ResponseBody String addLog (@RequestParam String user_id, @RequestParam String type, @RequestParam Integer token_count, @RequestParam String source) {
         // @ResponseBody means the returned String is the response, not a view name
         // @RequestParam means it is a parameter from the GET or POST request
 
