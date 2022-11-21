@@ -329,7 +329,10 @@ public class EarnServiceI implements EarnService {
         Request request = builder.build();
         try (Response response = client.newCall(request).execute()) {
             return response.code();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+        return 400;
     }
 
     private Map<String, Student> getStudents() throws IOException, JSONException {
@@ -545,7 +548,6 @@ public class EarnServiceI implements EarnService {
         Integer token_amount = entity.getToken_count();
         if (token_amount >= cost) {
             Date current_time = new Date();
-            token_amount = token_amount - cost;
             String title = "Resubmission";
             Date due =  new Date(current_time.getTime() + 24*60*60*1000);
 
@@ -561,6 +563,7 @@ public class EarnServiceI implements EarnService {
 
             switch (apiProcess(url, body, true)) {
                 case 201:
+                    token_amount -= cost;
                     entity.setToken_count(token_amount);
                     entity.setTimestamp(current_time);
                     tokenRepository.save(entity);
@@ -569,6 +572,8 @@ public class EarnServiceI implements EarnService {
                     Map<String, Student> studentMap = getStudents();
                     logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend", cost, "Assignment: " + resubmission.getName()));
                     return new UseTokenResponse("success", "", token_amount);
+                case 400:
+                    return new UseTokenResponse("failed", "Student already requested resubmission", token_amount);
                 default:
                     return new UseTokenResponse("failed", "Unable to update tokens", token_amount);
             }
