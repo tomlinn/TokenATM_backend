@@ -270,6 +270,8 @@ public class EarnServiceI implements EarnService {
             Date deadline = survey_deadlines.get(i);
             scheduler.schedule(() -> syncSurvey(surveyId), deadline);
         }
+
+        scheduler.schedule(() -> syncLog(), module_deadline);
     }
 
     @Override
