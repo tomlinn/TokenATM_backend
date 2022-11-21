@@ -1,11 +1,13 @@
 package com.capstone.tokenatm.controller;
 
 import com.capstone.tokenatm.entity.TokenCountEntity;
+import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
-import com.capstone.tokenatm.service.AssignmentStatus;
+import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.Beans.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
-import com.capstone.tokenatm.service.Student;
-import com.capstone.tokenatm.service.TokenRepository;
+import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
+import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -95,14 +97,19 @@ public class EarnController {
         }
     }
 
-    @GetMapping(path="/use_token/{user_id}/{assignment_id}/{cost}")
-    public @ResponseBody String spendToken(@PathVariable String user_id, @PathVariable String assignment_id, @PathVariable Integer cost) throws IOException {
-        return earnService.spendToken(user_id, assignment_id, cost);
+    /**
+     * Body: {
+     *     "assignment_id": string,
+     *     "cost": int
+     * }
+     */
+    @PostMapping(path="/use_token/{user_id}")
+    public @ResponseBody UseTokenResponse useToken(@PathVariable String user_id, @RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
+        return earnService.useToken(user_id, body.getAssignment_id(), body.getToken_count());
     }
 
     @PostMapping("/update")
-    public @ResponseBody String updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) {
-        earnService.updateToken(studentId, tokenNum);
-        return "ok";
+    public @ResponseBody UpdateTokenResponse updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) {
+        return earnService.updateToken(studentId, tokenNum);
     }
 }

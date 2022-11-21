@@ -1,4 +1,4 @@
-package com.capstone.tokenatm.service;
+package com.capstone.tokenatm.service.Beans;
 
 import java.util.Date;
 
@@ -6,6 +6,9 @@ public class AssignmentStatus {
 
     //Assignment name
     private String name;
+
+    //Assignment Id
+    private String assignment_id;
 
     //Assignment due date
     private String deadline;
@@ -28,8 +31,9 @@ public class AssignmentStatus {
 
     private int token_required;
 
-    public AssignmentStatus(String name, String deadline, double grade, double maxGrade, String status, int token_required) {
+    public AssignmentStatus(String name, String assignment_id, String deadline, double grade, double maxGrade, String status, int token_required) {
         this.name = name;
+        this.assignment_id = assignment_id;
         this.deadline = deadline;
         this.grade = grade;
         this.maxGrade = maxGrade;
@@ -51,5 +55,9 @@ public class AssignmentStatus {
 
     public double getMaxGrade() {
         return maxGrade;
+    }
+
+    public String getAssignment_id() {
+        return assignment_id;
     }
 }

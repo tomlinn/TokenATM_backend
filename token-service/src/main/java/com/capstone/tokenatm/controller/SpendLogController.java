@@ -16,12 +16,13 @@ public class SpendLogController {
     private LogRepository logRepository;
 
     @PostMapping(path="/add_log") // Map ONLY POST Requests
-    public @ResponseBody String addLog (@RequestParam String user_id, @RequestParam String type, @RequestParam Integer token_count, @RequestParam String source) {
+    public @ResponseBody String addLog (@RequestParam String user_id, @RequestParam String user_name, @RequestParam String type, @RequestParam Integer token_count, @RequestParam String source) {
         // @ResponseBody means the returned String is the response, not a view name
         // @RequestParam means it is a parameter from the GET or POST request
 
         SpendLogEntity n = new SpendLogEntity();
         n.setUser_id(user_id);
+        n.setUser_name(user_name);
         n.setType(type);
         n.setTokenCount(token_count);
         n.setSourcee(source);
@@ -37,7 +38,7 @@ public class SpendLogController {
     }
 
     @GetMapping(path="/logs/{user_id}")
-    public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@PathVariable Integer user_id) {
+    public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@PathVariable String user_id) {
         return logRepository.findByUserId(user_id);
     }
 }

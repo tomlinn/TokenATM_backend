@@ -5,7 +5,11 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.*;
+import com.capstone.tokenatm.service.Beans.Assignment;
+import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.Beans.Student;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
+import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +25,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URL;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -58,8 +63,13 @@ public class EarnServiceI implements EarnService {
     //List of Quizzes in the first module (which needs over 70% average to earn the initial 2 tokens)
     private static List<String> tokenQuizIds = Arrays.asList("12427623", "12476618", "12476695");
 
-    //List of assignments that are can be resubmitted
-    private static List<String> resubmissionIds = Arrays.asList("33741790", "33741750", "33741783");
+    //Map of assignments that are can be resubmitted
+    private static Map<String, String> resubmissionsMap = new HashMap<>();
+    static {
+        resubmissionsMap.put("33741790", "33811609");
+        resubmissionsMap.put("33741750", "33811823");
+        resubmissionsMap.put("33741783", "33811829");
+    }
 
     //List of surveys
     private static List<String> tokenSurveyIds = Arrays.asList("SV_8oIf0qAz5g0TFiK");
@@ -113,6 +123,8 @@ public class EarnServiceI implements EarnService {
     }
 
     public void init() throws JSONException, IOException {
+        logRepository.deleteAll();
+        tokenRepository.deleteAll();
         Map<String, Student> studentMap = getStudents();
         studentMap.entrySet().stream().forEach(e -> {
             Student student = e.getValue();
@@ -149,12 +161,13 @@ public class EarnServiceI implements EarnService {
         tokenRepository.save(entity);
 
         //Generate token use log
-        logRepository.save(createLog(user_id, add_count >= 0 ? "earn" : "spend", add_count, source));
+        logRepository.save(createLog(user_id, student.getName(), add_count >= 0 ? "earn" : "spend", add_count, source));
     }
 
-    private SpendLogEntity createLog(String user_id, String type, Integer token_count, String source) {
+    private SpendLogEntity createLog(String user_id, String user_name, String type, Integer token_count, String source) {
         SpendLogEntity n = new SpendLogEntity();
         n.setUser_id(user_id);
+        n.setUser_name(user_name);
         n.setType(type);
         n.setTokenCount(token_count);
         n.setSourcee(source);
@@ -180,7 +193,6 @@ public class EarnServiceI implements EarnService {
         try {
             completed_emails = getSurveyCompletions(surveyId);
             studentMap = getStudents();
-            System.out.println("Student Map: " + studentMap);
         } catch (InternalServerException | IOException | JSONException e) {
             e.printStackTrace();
         }
@@ -480,51 +492,86 @@ public class EarnServiceI implements EarnService {
         return completedEmails;
     }
 
-    public String spendToken(String user_id, String assignment_id, Integer cost) throws IOException {
-        Optional<TokenCountEntity> user_data = tokenRepository.findById(user_id);
-        Integer token_count = user_data.get().getToken_count();
+    //This is the version of updating the original assignment, currently not under use
+//    public UseTokenResponse useToken_OriginalAssignment(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
+//        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
+//        if (!optional.isPresent()) {
+//            LOGGER.error("Error: Student " + user_id + " is not in current database");
+//            throw new BadRequestException("Student " + user_id + " is not in current database");
+//        }
+//        TokenCountEntity entity = optional.get();
+//        Integer token_amount = entity.getToken_count();
+//        if (token_amount >= cost) {
+//            Date current_time = new Date();
+//            token_amount = token_amount - cost;
+//            String title = "Resubmission";
+//            Date due =  new Date(current_time.getTime() + 24*60*60*1000);
+//
+//            URL url = UriComponentsBuilder
+//                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignment_id + "/overrides")
+//                    .build().toUri().toURL();
+//            RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
+//                                                          .addFormDataPart("assignment_override[student_ids][]",user_id)
+//                                                          .addFormDataPart("assignment_override[title]",title)
+//                                                          .addFormDataPart("assignment_override[lock_at]",due.toString())
+//                                                          .build();
+//
+//            switch (apiProcess(url, body, true)) {
+//                case 201:
+//                    entity.setToken_count(token_amount);
+//                    entity.setTimestamp(current_time);
+//                    tokenRepository.save(entity);
+//
+//                    Assignment assignment = fetchAssignment(assignment_id);
+//                    logRepository.save(createLog(user_id, "spend", cost, "Assignment: " + assignment.getName()));
+//                    return new UseTokenResponse("success", "", token_amount);
+//                default:
+//                    return new UseTokenResponse("failed", "Unable to update tokens", token_amount);
+//            }
+//        }
+//        return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
+//    }
 
-        if (token_count >= cost) {
+    @Override
+    public UseTokenResponse useToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
+        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
+        if (!optional.isPresent()) {
+            LOGGER.error("Error: Student " + user_id + " is not in current database");
+            throw new BadRequestException("Student " + user_id + " is not in current database");
+        }
+        TokenCountEntity entity = optional.get();
+        Integer token_amount = entity.getToken_count();
+        if (token_amount >= cost) {
             Date current_time = new Date();
-            token_count = token_count - cost;
-            Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
-            TokenCountEntity entity = null;
-            entity = optional.get();
-            entity.setToken_count(token_count);
-            entity.setTimestamp(current_time);
-            tokenRepository.save(entity);
-
-            SpendLogEntity n = new SpendLogEntity();
-            n.setUser_id(user_id);
-            n.setType("Spend");
-            n.setTokenCount(-cost);
-            n.setSourcee(assignment_id);
-            n.setTimestamp(current_time);
-            logRepository.save(n);
-
+            token_amount = token_amount - cost;
             String title = "Resubmission";
             Date due =  new Date(current_time.getTime() + 24*60*60*1000);
 
+            String resubmission_id = resubmissionsMap.get(assignment_id);
             URL url = UriComponentsBuilder
-                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignment_id + "/overrides")
+                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + resubmission_id + "/overrides")
                     .build().toUri().toURL();
             RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
-                                                          .addFormDataPart("assignment_override[student_ids][]",user_id)
-                                                          .addFormDataPart("assignment_override[title]",title)
-                                                          .addFormDataPart("assignment_override[lock_at]",due.toString())
-                                                          .build();
+                    .addFormDataPart("assignment_override[student_ids][]",user_id)
+                    .addFormDataPart("assignment_override[title]",title)
+                    .addFormDataPart("assignment_override[lock_at]",due.toString())
+                    .build();
 
             switch (apiProcess(url, body, true)) {
                 case 201:
-                    return "success, resubmission just opened";
-                case 400:
-                    return "failed, resubmission may already be opened for this student.";
+                    entity.setToken_count(token_amount);
+                    entity.setTimestamp(current_time);
+                    tokenRepository.save(entity);
+
+                    Assignment resubmission = fetchAssignment(resubmission_id);
+                    Map<String, Student> studentMap = getStudents();
+                    logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend", cost, "Assignment: " + resubmission.getName()));
+                    return new UseTokenResponse("success", "", token_amount);
                 default:
-                    return "error";
+                    return new UseTokenResponse("failed", "Unable to update tokens", token_amount);
             }
         }
-
-        return "failed, you don't have enough token";
+        return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
     }
 
     private class ExportResponse {
@@ -588,12 +635,18 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException {
+    public List<AssignmentStatus> getAssignmentStatuses(String user_id) {
         LOGGER.info("Fetching assignment statuses for " + user_id);
         List<AssignmentStatus> assignmentStatuses = new ArrayList<>();
-        for (String assignmentId : resubmissionIds) {
-            assignmentStatuses.add(getAssignmentStatusForStudent(user_id, assignmentId));
-        }
+        resubmissionsMap.entrySet().stream().forEach(e -> {
+            String assignmentId = e.getKey();
+            String resubmissionId = e.getValue();
+            try {
+                assignmentStatuses.add(getAssignmentStatusForStudent(user_id, assignmentId, resubmissionId));
+            } catch (IOException | JSONException ex) {
+                ex.printStackTrace();
+            }
+        });
         return assignmentStatuses;
     }
 
@@ -604,9 +657,11 @@ public class EarnServiceI implements EarnService {
      * @param assignmentId
      * @return
      */
-    private AssignmentStatus getAssignmentStatusForStudent(String user_id, String assignmentId) throws IOException, JSONException {
+    private AssignmentStatus getAssignmentStatusForStudent(String user_id, String assignmentId, String resubmissionId) throws IOException, JSONException {
         int page = 1;
         Assignment assignment = fetchAssignment(assignmentId);
+        Assignment resubmission = fetchAssignment(resubmissionId);
+
         while (true) {
             URL url = UriComponentsBuilder
                     .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignmentId + "/submissions")
@@ -623,19 +678,41 @@ public class EarnServiceI implements EarnService {
                     score = submissionObj.isNull("score") ? null : submissionObj.getDouble("score");
                     //Doesn't have a grade yet or can't fetch grade
                     if (score == null) {
-                        return new AssignmentStatus(assignment.getName(), assignment.getDueDate(), 0.0, assignment.getMaxPoints(), "Not graded yet", -1);
+                        return new AssignmentStatus(assignment.getName(), assignment.getId(), assignment.getDueDate(), 0.0, assignment.getMaxPoints(), "Not graded yet", -1);
                     }
                     //Grades released
                     int tokens_required = (int) (assignment.getMaxPoints() - score);
-                    String status = StreamSupport.stream(logRepository.findByUserIdAssignmentId(Integer.valueOf(user_id), assignmentId).spliterator(), false).count() > 0 ? "requested" : "none";
-                    return new AssignmentStatus(assignment.getName(), assignment.getDueDate(), score, assignment.getMaxPoints(), status, tokens_required);
+                    if (!resubmission.getDueDate().equals("No Due Date")
+                            && Instant.now().isAfter(Instant.parse(resubmission.getDueDate()))) {
+                        return new AssignmentStatus(assignment.getName(),
+                                assignment.getId(),
+                                resubmission.getDueDate(),
+                                score,
+                                assignment.getMaxPoints(),
+                                "overdue",
+                                -1);
+                    }
+                    String status = StreamSupport.stream(logRepository.findByUserIdAssignmentId(user_id, resubmissionId).spliterator(), false).count() > 0 ? "requested" : "none";
+                    return new AssignmentStatus(assignment.getName(),
+                            assignment.getId(),
+                            resubmission.getDueDate(),
+                            score,
+                            assignment.getMaxPoints(),
+                            status,
+                            tokens_required);
                 }
             }
             if (resultArray.length() < PER_PAGE)
                 break;
             page++;
         }
-        return new AssignmentStatus(assignment.getName(), assignment.getDueDate(), 0.0, assignment.getMaxPoints(), "N/A", -1);
+        return new AssignmentStatus(assignment.getName(),
+                assignment.getId(),
+                resubmission.getDueDate(),
+                0.0,
+                assignment.getMaxPoints(),
+                "N/A",
+                -1);
     }
 
     private Assignment fetchAssignment(String assignmentId) throws IOException, JSONException {
@@ -643,8 +720,8 @@ public class EarnServiceI implements EarnService {
                 .build().toUri().toURL();
         String response = apiProcess(url, true);
         JSONObject responseObj = new JSONObject(response);
-        String dueAt = responseObj.getString("due_at");
-        if (dueAt == null) {
+        String dueAt = responseObj.getString("lock_at");
+        if (dueAt == null || dueAt.equals("null")) {
             dueAt = "No Due Date";
         }
         double pointsPossible = responseObj.getDouble("points_possible");
@@ -658,11 +735,11 @@ public class EarnServiceI implements EarnService {
         if (optional.isPresent()) {
             TokenCountEntity entity = optional.get();
             entity.setToken_count(tokenNum);
+            tokenRepository.save(entity);
             return new UpdateTokenResponse("complete", tokenNum);
         } else {
             LOGGER.error("Error: Student " + user_id + " does not exist in database");
             return new UpdateTokenResponse("failed", -1);
         }
     }
-
 }

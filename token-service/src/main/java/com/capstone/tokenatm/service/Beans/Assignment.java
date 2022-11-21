@@ -1,4 +1,4 @@
-package com.capstone.tokenatm.service;
+package com.capstone.tokenatm.service.Beans;
 
 public class Assignment {
 
