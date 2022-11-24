@@ -10,6 +10,7 @@ package io.renren.modules.sys.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import io.renren.common.utils.R;
+import io.renren.modules.sys.entity.SysUserEntity;
 import io.renren.modules.sys.entity.SysUserTokenEntity;
 
 /**
@@ -23,12 +24,12 @@ public interface SysUserTokenService extends IService<SysUserTokenEntity> {
 	 * 生成token
 	 * @param userId  用户ID
 	 */
-	R createToken(long userId);
+	R createToken(SysUserEntity userId);
 
 	/**
 	 * 退出，修改token值
 	 * @param userId  用户ID
 	 */
-	void logout(long userId);
+	void logout(SysUserEntity userId);
 
 }

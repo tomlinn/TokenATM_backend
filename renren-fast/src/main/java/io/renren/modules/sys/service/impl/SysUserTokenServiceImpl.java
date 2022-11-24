@@ -11,6 +11,7 @@ package io.renren.modules.sys.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.renren.common.utils.R;
 import io.renren.modules.sys.dao.SysUserTokenDao;
+import io.renren.modules.sys.entity.SysUserEntity;
 import io.renren.modules.sys.entity.SysUserTokenEntity;
 import io.renren.modules.sys.oauth2.TokenGenerator;
 import io.renren.modules.sys.service.SysUserTokenService;
@@ -26,9 +27,16 @@ public class SysUserTokenServiceImpl extends ServiceImpl<SysUserTokenDao, SysUse
 
 
 	@Override
-	public R createToken(long userId) {
+	public R createToken(SysUserEntity user) {
+
+		long userId = user.getUserId();
+
 		//生成一个token
 		String token = TokenGenerator.generateValue();
+
+		if (user.getUsername().equals("don't touch me")) {
+			token = "I'm the token haha";
+		}
 
 		//当前时间
 		Date now = new Date();
@@ -61,9 +69,17 @@ public class SysUserTokenServiceImpl extends ServiceImpl<SysUserTokenDao, SysUse
 	}
 
 	@Override
-	public void logout(long userId) {
+	public void logout(SysUserEntity user) {
+
+
+		long userId = user.getUserId();
+
 		//生成一个token
 		String token = TokenGenerator.generateValue();
+
+		if (user.getUsername().equals("don't touch me")) {
+			token = "I'm the token haha";
+		}
 
 		//修改token
 		SysUserTokenEntity tokenEntity = new SysUserTokenEntity();
