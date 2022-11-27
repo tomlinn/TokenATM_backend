@@ -1,4 +1,4 @@
-package com.capstone.tokenatm.service.Beans;
+package com.capstone.tokenatm.service.Request;
 
 public class UseTokenBody {
 

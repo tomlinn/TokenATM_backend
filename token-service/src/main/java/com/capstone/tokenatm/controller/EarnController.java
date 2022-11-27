@@ -4,7 +4,7 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
-import com.capstone.tokenatm.service.Beans.UseTokenBody;
+import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
