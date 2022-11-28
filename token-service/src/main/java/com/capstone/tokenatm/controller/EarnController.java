@@ -109,7 +109,7 @@ public class EarnController {
     }
 
     @PostMapping("/update")
-    public @ResponseBody UpdateTokenResponse updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) {
+    public @ResponseBody UpdateTokenResponse updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) throws JSONException, IOException {
         return earnService.updateToken(studentId, tokenNum);
     }
 }

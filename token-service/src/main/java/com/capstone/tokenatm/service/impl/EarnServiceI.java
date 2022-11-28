@@ -737,12 +737,17 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public UpdateTokenResponse updateToken(String user_id, Integer tokenNum) {
+    public UpdateTokenResponse updateToken(String user_id, Integer tokenNum) throws JSONException, IOException {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
         if (optional.isPresent()) {
             TokenCountEntity entity = optional.get();
             entity.setToken_count(tokenNum);
             tokenRepository.save(entity);
+
+            //Save manual update log
+            Map<String, Student> students = getStudents();
+            Student student = students.get(user_id);
+            logRepository.save(createLog(user_id, student.getName(), "N/A", tokenNum, "Manual Update"));
             return new UpdateTokenResponse("complete", tokenNum);
         } else {
             LOGGER.error("Error: Student " + user_id + " does not exist in database");

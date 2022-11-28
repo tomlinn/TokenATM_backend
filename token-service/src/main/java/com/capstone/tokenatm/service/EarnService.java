@@ -38,6 +38,6 @@ public interface EarnService {
 
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
 
-    UpdateTokenResponse updateToken(String user_id, Integer tokenNum);
+    UpdateTokenResponse updateToken(String user_id, Integer tokenNum) throws JSONException, IOException;
 }
 
