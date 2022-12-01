@@ -1,9 +1,12 @@
 package com.capstone.tokenatm.controller;
 
 import com.capstone.tokenatm.entity.VerficationEntity;
+import com.capstone.tokenatm.service.Beans.Student;
 import com.capstone.tokenatm.service.EmailService;
+import com.capstone.tokenatm.service.Request.RequestForgetBody;
 import com.capstone.tokenatm.service.Request.RequestVerificationBody;
 import com.capstone.tokenatm.service.Request.VerificationBody;
+import com.capstone.tokenatm.service.Response.RequestForgetResponse;
 import com.capstone.tokenatm.service.Response.RequestVerificationResponse;
 import com.capstone.tokenatm.service.Response.VerificationResponse;
 import com.capstone.tokenatm.service.VerificationRepository;
@@ -12,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
@@ -28,7 +32,14 @@ public class RegisterController {
     public RequestVerificationResponse requestVerificationCode(@RequestBody RequestVerificationBody body) {
         String email = body.getEmail();
         String verification = getRandomVerification();
-        verificationRepository.save(new VerficationEntity(email, verification));
+        Optional<VerficationEntity> optional = verificationRepository.findByEmail(email);
+        if (optional.isPresent()) {
+            VerficationEntity entity = optional.get();
+            entity.setCode(verification);
+            verificationRepository.save(entity);
+        } else {
+            verificationRepository.save(new VerficationEntity(email, verification));
+        }
         emailService.sendSimpleMessage(body.getEmail(), "Your Token ATM Registration Code", verification);
         return new RequestVerificationResponse("success", "");
     }
