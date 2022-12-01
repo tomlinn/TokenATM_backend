@@ -17,6 +17,7 @@ import io.renren.common.validator.ValidatorUtils;
 import io.renren.common.validator.group.AddGroup;
 import io.renren.common.validator.group.UpdateGroup;
 import io.renren.modules.sys.entity.SysUserEntity;
+import io.renren.modules.sys.form.ForgetPasswordForm;
 import io.renren.modules.sys.form.PasswordForm;
 import io.renren.modules.sys.service.SysUserRoleService;
 import io.renren.modules.sys.service.SysUserService;
@@ -85,6 +86,15 @@ public class SysUserController extends AbstractController {
 			return R.error("原密码不正确");
 		}
 		
+		return R.ok();
+	}
+
+	@PostMapping("/forget_password")
+	public R forgetPassword(@RequestBody ForgetPasswordForm form) {
+		String email = form.getEmail();
+		SysUserEntity entity = sysUserService.queryByUserName(email);
+		String newPassword = new Sha256Hash(form.getPassword(), entity.getSalt()).toHex();
+		sysUserService.updatePassword(entity.getUserId(), entity.getPassword(), newPassword);
 		return R.ok();
 	}
 	
