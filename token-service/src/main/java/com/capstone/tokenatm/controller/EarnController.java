@@ -4,6 +4,7 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Request.RequestUserIdBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
@@ -40,24 +41,6 @@ public class EarnController {
     @GetMapping(path="/tokens/{user_id}")
     public @ResponseBody Optional<TokenCountEntity> getTokenForStudent(@PathVariable String user_id) {
         return earnService.getStudentTokenCount(user_id);
-    }
-
-    //For testing if Qualtrics is working
-    @GetMapping("/whoami")
-    public String whoami(
-    ) throws InternalServerException {
-        try {
-            return earnService.getIdentity();
-        } catch (JSONException | IOException e) {
-            LOGGER.error(e.toString());
-            throw new InternalServerException();
-        }
-    }
-
-    @GetMapping("/survey_export")
-    public Set<String> getSurveyExport(
-    ) throws InternalServerException {
-        return earnService.getSurveyCompletions("SV_8oIf0qAz5g0TFiK");
     }
 
     @GetMapping("/grades")

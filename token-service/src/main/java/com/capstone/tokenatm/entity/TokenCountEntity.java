@@ -29,6 +29,10 @@ public class TokenCountEntity {
 
     private Date timestamp;
 
+    public String getUser_name() {
+        return user_name;
+    }
+
     public String getUser_id() {
         return user_id;
     }

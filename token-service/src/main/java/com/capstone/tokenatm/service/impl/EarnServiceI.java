@@ -7,6 +7,7 @@ import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.*;
 import com.capstone.tokenatm.service.Beans.Assignment;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Beans.Student;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
@@ -46,27 +47,21 @@ public class EarnServiceI implements EarnService {
     private static final String BEARER_TOKEN = "7~sKb3Kq7M9EjSgDtMhugxCEs5oD76pbJgBWAFScBliSi7Iin8QubiBHEBlrWfYunG";
     //Testing endpoint for Canvas
     private static final String CANVAS_API_ENDPOINT = "https://canvas.instructure.com/api/v1";
+
+    private static final String QUALTRICS_API_ENDPOINT = "https://iad1.qualtrics.com/API/v3";
+
     //Course Id
     private static final int COURSE_ID = 3737737;
 
-    //Qualtrics API Settings
-    //TODO: The API Endpoint and API key is only used for testing. Please change to UCI endpoint and actual keys in prod
-    //API Key for Qualtrics
-    private static final String API_KEY = "3yoP4lV2G7wmxOVtIkH6G8K5IcGDgtdUf2Ys3um9";
-    //Testing endpoint for Qualtrics
-    private static final String QUALTRICS_API_ENDPOINT = "https://iad1.qualtrics.com/API/v3";
+    //List of Quizzes in the first module (which needs over 70% average to earn the initial 2 tokens)
+    private static List<String> tokenQuizIds = Arrays.asList("12427623", "12476618", "12476695");
 
-    private static final String QualtricsBody = "{\"format\":\"json\",\"compress\":\"false\"}";
     public static final MediaType JSON
             = MediaType.get("application/json; charset=utf-8");
 
     public static final int PER_PAGE = 100;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EarnService.class);
-
-
-    //List of Quizzes in the first module (which needs over 70% average to earn the initial 2 tokens)
-    private static List<String> tokenQuizIds = Arrays.asList("12427623", "12476618", "12476695");
 
     //Map of assignments that are can be resubmitted
     private static Map<String, String> resubmissionsMap = new HashMap<>();
@@ -84,6 +79,9 @@ public class EarnServiceI implements EarnService {
 
     @Autowired
     private LogRepository logRepository;
+
+    @Autowired
+    private QualtricsService qualtricsService;
 
     //Token earning deadlines
     private static final List<Date> survey_deadlines = new ArrayList<>();
@@ -197,7 +195,7 @@ public class EarnServiceI implements EarnService {
         Set<String> usersToUpdate = new HashSet<>();//List of user_ids that should +1 token
         Set<String> completed_emails = new HashSet<>();
         try {
-            completed_emails = getSurveyCompletions(surveyId);
+            completed_emails = qualtricsService.getSurveyCompletions(surveyId);
             studentMap = getStudents();
         } catch (InternalServerException | IOException | JSONException e) {
             e.printStackTrace();
@@ -288,29 +286,12 @@ public class EarnServiceI implements EarnService {
         return tokenRepository.findById(user_id);
     }
 
-    @Override
-    public String getIdentity() throws IOException {
-        URL url = UriComponentsBuilder
-                .fromUriString(QUALTRICS_API_ENDPOINT + "/whoami")
-                .build().toUri().toURL();
-        String response = apiProcess(url, false);
-        return response;
-    }
-
-    private String apiProcess(URL url, Boolean isCanvas) throws IOException {
-        return apiProcess(url, "", isCanvas);
-    }
-
-    private String apiProcess(URL url, String body, Boolean isCanvas) throws IOException {
+    private String apiProcess(URL url, String body) throws IOException {
         OkHttpClient client = new OkHttpClient();
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
-        if (isCanvas) {
-            builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
-        } else {
-            builder.addHeader("X-API-TOKEN", API_KEY);
-        }
+        builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
         if (body.length() > 0) {
             builder.post(RequestBody.create(body, JSON));
         }
@@ -319,16 +300,12 @@ public class EarnServiceI implements EarnService {
             return response.body().string();
         }
     }
-    private Integer apiProcess(URL url, RequestBody body, Boolean isCanvas) throws IOException {
+    private Integer apiProcess(URL url, RequestBody body) throws IOException {
         OkHttpClient client = new OkHttpClient();
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
-        if (isCanvas) {
-            builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
-        } else {
-            builder.addHeader("X-API-TOKEN", API_KEY);
-        }
+        builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
         builder.method("POST",body);
         Request request = builder.build();
         try (Response response = client.newCall(request).execute()) {
@@ -349,7 +326,7 @@ public class EarnServiceI implements EarnService {
                     .queryParam("per_page", PER_PAGE)
                     .build().toUri().toURL();
 
-            String response = apiProcess(url, true);
+            String response = apiProcess(url, "");
             JSONArray result = new JSONArray(response);
             for (int i = 0; i < result.length(); i++) {
                 String id = ((JSONObject) result.get(i)).get("id").toString();
@@ -374,7 +351,7 @@ public class EarnServiceI implements EarnService {
         while (true) {
             URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/students/submissions?exclude_response_fields%5B%5D=preview_url&grouped=1&response_fields%5B%5D=assignment_id&response_fields%5B%5D=attachments&response_fields%5B%5D=attempt&response_fields%5B%5D=cached_due_date&response_fields%5B%5D=entered_grade&response_fields%5B%5D=entered_score&response_fields%5B%5D=excused&response_fields%5B%5D=grade&response_fields%5B%5D=grade_matches_current_submission&response_fields%5B%5D=grading_period_id&response_fields%5B%5D=id&response_fields%5B%5D=late&response_fields%5B%5D=late_policy_status&response_fields%5B%5D=missing&response_fields%5B%5D=points_deducted&response_fields%5B%5D=posted_at&response_fields%5B%5D=redo_request&response_fields%5B%5D=score&response_fields%5B%5D=seconds_late&response_fields%5B%5D=submission_type&response_fields%5B%5D=submitted_at&response_fields%5B%5D=url&response_fields%5B%5D=user_id&response_fields%5B%5D=workflow_state&student_ids%5B%5D="
                     + users_id + "&page=" + page + "&per_page=" + PER_PAGE);
-            String response = apiProcess(url, true);
+            String response = apiProcess(url, "");
             JSONArray result = new JSONArray(response);
 
             for (int i = 0; i < result.length(); i++) {
@@ -403,7 +380,7 @@ public class EarnServiceI implements EarnService {
         while (true) {
             URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignment_groups?exclude_assignment_submission_types%5B%5D=wiki_page&exclude_response_fields%5B%5D=description&exclude_response_fields%5B%5D=in_closed_grading_period&exclude_response_fields%5B%5D=needs_grading_count&exclude_response_fields%5B%5D=rubric&include%5B%5D=assignment_group_id&include%5B%5D=assignment_visibility&include%5B%5D=assignments&include%5B%5D=grades_published&include%5B%5D=post_manually&include%5B%5D=module_ids&override_assignment_dates=false"
                     + "&page=" + page + "&per_page=" + PER_PAGE);
-            JSONArray response = new JSONArray(apiProcess(url, true));
+            JSONArray response = new JSONArray(apiProcess(url, ""));
             for (int i = 0; i < response.length(); i++) {
                 for (int j = 0; j < ((JSONArray) ((JSONObject) response.get(i)).get("assignments")).length(); j++) {
                     HashMap<Object, Object> item = new HashMap<>();
@@ -422,83 +399,7 @@ public class EarnServiceI implements EarnService {
         return result;
     }
 
-    /**
-     * Fetch completion status of required surveys
-     * See https://api.qualtrics.com/6b00592b9c013-start-response-export for details of API
-     *
-     * @return
-     * @throws IOException
-     * @throws JSONException
-     * @throws BadRequestException
-     */
-    @Override
-    public Set<String> getSurveyCompletions(String surveyId) throws InternalServerException {
-        try {
-            URL url = UriComponentsBuilder
-                    .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses")
-                    .build().toUri().toURL();
-            String response = apiProcess(url, QualtricsBody, false);
-            JSONObject resultObj = new JSONObject(response).getJSONObject("result");
-            String progressId = resultObj.getString("progressId");
-            ExportResponse exportResponse = null;
-            while (true) {
-                exportResponse = getExportStatus(surveyId, progressId);
-                LOGGER.info("Current status: " + exportResponse.status + ", Progress: " + exportResponse.getPercentComplete());
-                if (exportResponse.getStatus().equals("complete")) {
-                    //export success
-                    return getSurveyCompletedEmailAddresses(surveyId, exportResponse.getFileId());
-                } else if (exportResponse.getStatus().equals("failed")) {
-                    //export failed
-                    LOGGER.error("Failed to download survey export, progress = " + exportResponse.getPercentComplete() + "%");
-                    throw new InternalServerException("Download of survey export failed");
-                } else {
-                    //still in progress
-                    LOGGER.info("Download in progress, current completed: " + exportResponse.getPercentComplete() + "%");
-                }
-            }
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-            throw new InternalServerException("Error when processing survey data");
-        }
 
-    }
-
-    /**
-     * Fetch the current exporting progress of given progressId, should iterate until percentage is 100.0
-     *
-     * @param progressId
-     * @return
-     * @throws IOException
-     * @throws JSONException
-     */
-    private ExportResponse getExportStatus(String surveyId, String progressId) throws IOException, JSONException {
-        URL url = UriComponentsBuilder
-                .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses/" + progressId)
-                .build().toUri().toURL();
-        String response = apiProcess(url, false);
-        //A more elegant way is to use the ObjectMapper, but initializing it is very costly
-        JSONObject resultObj = new JSONObject(response).getJSONObject("result");
-        return new ExportResponse(
-                resultObj.getString("fileId"),
-                resultObj.getDouble("percentComplete"),
-                resultObj.getString("status"));
-    }
-
-    private Set<String> getSurveyCompletedEmailAddresses(String surveyId, String fileId) throws IOException, JSONException {
-        LOGGER.info("FileId = " + fileId);
-        Set<String> completedEmails = new HashSet<>();
-        URL url = UriComponentsBuilder
-                .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses/" + fileId + "/file")
-                .build().toUri().toURL();
-        String response = apiProcess(url, false);
-        JSONArray responseList = new JSONObject(response).getJSONArray("responses");
-        for (int i = 0; i < responseList.length(); i++) {
-            JSONObject responseItem = responseList.getJSONObject(i).getJSONObject("values");
-            String emailAddress = responseItem.getString("EmailAddress");
-            completedEmails.add(emailAddress);
-        }
-        return completedEmails;
-    }
 
     //This is the version of updating the original assignment, currently not under use
 //    public UseTokenResponse useToken_OriginalAssignment(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
@@ -572,7 +473,7 @@ public class EarnServiceI implements EarnService {
                     .addFormDataPart("assignment_override[lock_at]",due.toString())
                     .build();
 
-            switch (apiProcess(url, body, true)) {
+            switch (apiProcess(url, body)) {
                 case 201:
                     token_amount -= cost;
                     entity.setToken_count(token_amount);
@@ -592,31 +493,6 @@ public class EarnServiceI implements EarnService {
         }
         return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
     }
-
-    private class ExportResponse {
-        public String getFileId() {
-            return fileId;
-        }
-
-        public double getPercentComplete() {
-            return percentComplete;
-        }
-
-        public String getStatus() {
-            return status;
-        }
-
-        private String fileId;
-        private double percentComplete;
-        private String status;
-
-        public ExportResponse(String fileId, double percentComplete, String status) {
-            this.fileId = fileId;
-            this.percentComplete = percentComplete;
-            this.status = status;
-        }
-    }
-
     /**
      * Fetch grades of all students for a specific quiz
      *
@@ -635,7 +511,7 @@ public class EarnServiceI implements EarnService {
             URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/quizzes/" + quizId +
                     "/submissions?exclude_response_fields%5B%5D=preview_url&grouped=1&response_fields%5B%5D=assignment_id&response_fields%5B%5D=attachments&response_fields%5B%5D=attempt&response_fields%5B%5D=cached_due_date&response_fields%5B%5D=entered_grade&response_fields%5B%5D=entered_score&response_fields%5B%5D=excused&response_fields%5B%5D=grade&response_fields%5B%5D=grade_matches_current_submission&response_fields%5B%5D=grading_period_id&response_fields%5B%5D=id&response_fields%5B%5D=late&response_fields%5B%5D=late_policy_status&response_fields%5B%5D=missing&response_fields%5B%5D=points_deducted&response_fields%5B%5D=posted_at&response_fields%5B%5D=redo_request&response_fields%5B%5D=score&response_fields%5B%5D=seconds_late&response_fields%5B%5D=submission_type&response_fields%5B%5D=submitted_at&response_fields%5B%5D=url&response_fields%5B%5D=user_id&response_fields%5B%5D=workflow_state&student_ids%5B%5D="
                     + users_id + "&page=" + page + "&per_page=" + PER_PAGE);
-            String response = apiProcess(url, true);
+            String response = apiProcess(url, "");
             JSONObject resultObj = new JSONObject(response);
             JSONArray result = resultObj.getJSONArray("quiz_submissions");
 
@@ -687,7 +563,7 @@ public class EarnServiceI implements EarnService {
                     .queryParam("page", page)
                     .queryParam("per_page", PER_PAGE)
                     .build().toUri().toURL();
-            String response = apiProcess(url, true);
+            String response = apiProcess(url, "");
             JSONArray resultArray = new JSONArray(response);
             for (int i = 0; i < resultArray.length(); i++) {
                 JSONObject submissionObj = resultArray.getJSONObject(i);
@@ -739,7 +615,7 @@ public class EarnServiceI implements EarnService {
     private Assignment fetchAssignment(String assignmentId) throws IOException, JSONException {
         URL url = UriComponentsBuilder.fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignmentId)
                 .build().toUri().toURL();
-        String response = apiProcess(url, true);
+        String response = apiProcess(url, "");
         JSONObject responseObj = new JSONObject(response);
         String dueAt = responseObj.getString("lock_at");
         if (dueAt == null || dueAt.equals("null")) {

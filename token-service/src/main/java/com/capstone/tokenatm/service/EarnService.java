@@ -22,11 +22,6 @@ public interface EarnService {
 
     Map<String, Double> getStudentTokenGrades() throws IOException, JSONException;
 
-    @Retryable(value = InternalServerException.class, maxAttempts = 10, backoff = @Backoff(delay = 1_000))
-    Set<String> getSurveyCompletions(String surveyId) throws InternalServerException;
-
-    String getIdentity() throws IOException, JSONException;
-
     Iterable<TokenCountEntity> getAllStudentTokenCounts();
 
     Optional<TokenCountEntity> getStudentTokenCount(String user_id);
