@@ -4,8 +4,10 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.Request.RequestUserIdBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
+import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import org.slf4j.Logger;
@@ -111,5 +113,10 @@ public class EarnController {
     @PostMapping("/update")
     public @ResponseBody UpdateTokenResponse updateToken(@RequestParam String studentId, @RequestParam Integer tokenNum) throws JSONException, IOException {
         return earnService.updateToken(studentId, tokenNum);
+    }
+
+    @PostMapping("/userid")
+    public @ResponseBody RequestUserIdResponse getUserId(@RequestBody RequestUserIdBody body) throws JSONException, IOException {
+        return earnService.getUserIdFromEmail(body.getEmail());
     }
 }

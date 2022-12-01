@@ -8,6 +8,7 @@ import com.capstone.tokenatm.service.*;
 import com.capstone.tokenatm.service.Beans.Assignment;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
 import com.capstone.tokenatm.service.Beans.Student;
+import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import okhttp3.*;
@@ -35,6 +36,10 @@ import java.util.stream.StreamSupport;
 @Service("EarnService")
 public class EarnServiceI implements EarnService {
 
+    @Autowired
+    EmailService emailService;
+
+    private static final List<String> INSTRUCTOR_EMAILS = Arrays.asList("tianret@uci.edu", "chingyal@uci.edu", "chaol33@uci.edu", "wenjunc3@uci.edu");
     //Canvas API settings
     //TODO: The API Endpoint and Bearer token is only used for testing. Please change to UCI endpoint and actual tokens in prod
     //Bearer Token for dummy canvas endpoint
@@ -535,6 +540,14 @@ public class EarnServiceI implements EarnService {
 //        return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
 //    }
 
+    private void sendNotificationEmail(Student student, Assignment assignment, int cost) {
+        String message = String.format("On %s %s (ID: %s) successfully requested to use %d tokens for resubmission of %s (ID: %s)",
+                new Date(), student.getName(), student.getId(), cost, assignment.getName(), assignment.getId());
+        for (String email : INSTRUCTOR_EMAILS) {
+            emailService.sendSimpleMessage(email, "Usage Update in Token ATM", message);
+        }
+    }
+
     @Override
     public UseTokenResponse useToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
@@ -569,6 +582,7 @@ public class EarnServiceI implements EarnService {
                     Assignment resubmission = fetchAssignment(resubmission_id);
                     Map<String, Student> studentMap = getStudents();
                     logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend", cost, "Assignment: " + resubmission.getName()));
+                    sendNotificationEmail(studentMap.get(user_id), resubmission, cost);
                     return new UseTokenResponse("success", "", token_amount);
                 case 400:
                     return new UseTokenResponse("failed", "Student already requested resubmission", token_amount);
@@ -734,6 +748,16 @@ public class EarnServiceI implements EarnService {
         double pointsPossible = responseObj.getDouble("points_possible");
         String name = responseObj.getString("name");
         return new Assignment(assignmentId, name, dueAt, pointsPossible);
+    }
+
+    @Override
+    public RequestUserIdResponse getUserIdFromEmail(String email) throws JSONException, IOException {
+        Map<String, Student> studentMap = getStudents();
+        for (Map.Entry<String, Student> entry : studentMap.entrySet()) {
+            if (entry.getValue().getEmail().equals(email))
+                return new RequestUserIdResponse(entry.getKey());
+        }
+        return new RequestUserIdResponse("-1");
     }
 
     @Override

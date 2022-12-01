@@ -4,6 +4,7 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import org.springframework.boot.configurationprocessor.json.JSONException;
@@ -39,5 +40,7 @@ public interface EarnService {
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
 
     UpdateTokenResponse updateToken(String user_id, Integer tokenNum) throws JSONException, IOException;
+
+    RequestUserIdResponse getUserIdFromEmail(String email) throws JSONException, IOException;
 }
 
