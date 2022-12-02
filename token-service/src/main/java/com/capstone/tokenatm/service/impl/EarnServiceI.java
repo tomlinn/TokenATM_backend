@@ -573,7 +573,7 @@ public class EarnServiceI implements EarnService {
                     score = submissionObj.isNull("score") ? null : submissionObj.getDouble("score");
                     //Doesn't have a grade yet or can't fetch grade
                     if (score == null) {
-                        return new AssignmentStatus(assignment.getName(), assignment.getId(), assignment.getDueDate(), 0.0, assignment.getMaxPoints(), "Not graded yet", -1);
+                        return new AssignmentStatus(assignment.getName(), assignment.getId(), resubmission.getId(), assignment.getDueDate(), 0.0, assignment.getMaxPoints(), "Not graded yet", -1);
                     }
                     //Grades released
                     int tokens_required = (int) (assignment.getMaxPoints() - score);
@@ -581,6 +581,7 @@ public class EarnServiceI implements EarnService {
                             && Instant.now().isAfter(Instant.parse(resubmission.getDueDate()))) {
                         return new AssignmentStatus(assignment.getName(),
                                 assignment.getId(),
+                                resubmission.getId(),
                                 resubmission.getDueDate(),
                                 score,
                                 assignment.getMaxPoints(),
@@ -592,6 +593,7 @@ public class EarnServiceI implements EarnService {
                             "requested" : "none";
                     return new AssignmentStatus(assignment.getName(),
                             assignment.getId(),
+                            resubmission.getId(),
                             resubmission.getDueDate(),
                             score,
                             assignment.getMaxPoints(),
@@ -605,6 +607,7 @@ public class EarnServiceI implements EarnService {
         }
         return new AssignmentStatus(assignment.getName(),
                 assignment.getId(),
+                resubmission.getId(),
                 resubmission.getDueDate(),
                 0.0,
                 assignment.getMaxPoints(),

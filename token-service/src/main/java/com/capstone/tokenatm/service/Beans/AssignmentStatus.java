@@ -10,6 +10,9 @@ public class AssignmentStatus {
     //Assignment Id
     private String assignment_id;
 
+    //Resubmission Id
+    private String resubmission_id;
+
     //Assignment due date
     private String deadline;
 
@@ -31,14 +34,23 @@ public class AssignmentStatus {
 
     private int token_required;
 
-    public AssignmentStatus(String name, String assignment_id, String deadline, double grade, double maxGrade, String status, int token_required) {
+    public AssignmentStatus(String name, String assignment_id, String resubmission_id, String deadline, double grade, double maxGrade, String status, int token_required) {
         this.name = name;
         this.assignment_id = assignment_id;
+        this.resubmission_id = resubmission_id;
         this.deadline = deadline;
         this.grade = grade;
         this.maxGrade = maxGrade;
         this.status = status;
         this.token_required = token_required;
+    }
+
+    public String getResubmission_id() {
+        return resubmission_id;
+    }
+
+    public void setResubmission_id(String resubmission_id) {
+        this.resubmission_id = resubmission_id;
     }
 
     public String getName() {
