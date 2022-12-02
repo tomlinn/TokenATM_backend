@@ -24,7 +24,7 @@ public class Constant {
     /**
      * 超级管理员ID
      */
-    public static final int SUPER_ADMIN = 2;
+    public static final int SUPER_ADMIN = 1;
     /**
      * 当前页码
      */
