@@ -4,6 +4,7 @@ import java.util.Date;
 
 import com.capstone.tokenatm.service.LogRepository;
 import com.capstone.tokenatm.entity.SpendLogEntity;
+import com.capstone.tokenatm.service.Request.RequestLogBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -37,8 +38,8 @@ public class SpendLogController {
         return logRepository.findAll();
     }
 
-    @GetMapping(path="/logs/{user_id}")
-    public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@PathVariable String user_id) {
-        return logRepository.findByUserId(user_id);
+    @PostMapping(path="/logs/")
+    public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@RequestBody RequestLogBody body) {
+        return logRepository.findByUserName(body.getName());
     }
 }
