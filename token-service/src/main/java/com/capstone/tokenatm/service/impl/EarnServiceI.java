@@ -1,5 +1,6 @@
 package com.capstone.tokenatm.service.impl;
 
+import com.capstone.tokenatm.entity.ConfigEntity;
 import com.capstone.tokenatm.entity.SpendLogEntity;
 import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
@@ -40,7 +41,7 @@ public class EarnServiceI implements EarnService {
     @Autowired
     EmailService emailService;
 
-    private static final List<String> INSTRUCTOR_EMAILS = Arrays.asList("tianret@uci.edu", "chingyal@uci.edu", "chaol33@uci.edu", "wenjunc3@uci.edu");
+    private static final List<String> INSTRUCTOR_EMAILS = Arrays.asList("chingyal@uci.edu");
     //Canvas API settings
     //TODO: The API Endpoint and Bearer token is only used for testing. Please change to UCI endpoint and actual tokens in prod
     //Bearer Token for dummy canvas endpoint
@@ -72,7 +73,6 @@ public class EarnServiceI implements EarnService {
     }
 
     //List of surveys
-    private static List<String> tokenSurveyIds = Arrays.asList("SV_8oIf0qAz5g0TFiK");
 
     @Autowired
     private TokenRepository tokenRepository;
@@ -80,6 +80,8 @@ public class EarnServiceI implements EarnService {
     @Autowired
     private LogRepository logRepository;
 
+    @Autowired
+    private ConfigRepository configRepository;
     @Autowired
     private QualtricsService qualtricsService;
 
@@ -180,6 +182,7 @@ public class EarnServiceI implements EarnService {
 
     public Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException {
         Iterable<SpendLogEntity> originalLogs = logRepository.findAll();
+        List<String> tokenSurveyIds = configRepository.findByType("qualtrics");
         init();
         syncModule();
         for (String surveyId : tokenSurveyIds) {
@@ -265,6 +268,7 @@ public class EarnServiceI implements EarnService {
         init();
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
         TaskScheduler scheduler = new ConcurrentTaskScheduler(executorService);
+        List<String> tokenSurveyIds = configRepository.findByType("qualtrics");
 
         //Schedule Module 1
         scheduler.schedule(() -> syncModule(), module_deadline);
