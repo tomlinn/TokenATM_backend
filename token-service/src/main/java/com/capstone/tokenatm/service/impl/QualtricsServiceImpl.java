@@ -2,10 +2,12 @@ package com.capstone.tokenatm.service.impl;
 
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
+import com.capstone.tokenatm.service.ConfigRepository;
 import com.capstone.tokenatm.service.QualtricsService;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONArray;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
@@ -21,10 +23,6 @@ public class QualtricsServiceImpl implements QualtricsService {
 
     //Qualtrics API Settings
     //TODO: The API Endpoint and API key is only used for testing. Please change to UCI endpoint and actual keys in prod
-    //API Key for Qualtrics
-    private static final String API_KEY = "3yoP4lV2G7wmxOVtIkH6G8K5IcGDgtdUf2Ys3um9";
-    //Testing endpoint for Qualtrics
-    private static final String QUALTRICS_API_ENDPOINT = "https://iad1.qualtrics.com/API/v3";
 
     private static final String QualtricsBody = "{\"format\":\"json\",\"compress\":\"false\"}";
 
@@ -32,6 +30,9 @@ public class QualtricsServiceImpl implements QualtricsService {
             = MediaType.get("application/json; charset=utf-8");
 
     private static final Logger LOGGER = LoggerFactory.getLogger(QualtricsServiceImpl.class);
+
+    @Autowired
+    private ConfigRepository configRepository;
 
     private class ExportResponse {
         public String getFileId() {
@@ -57,6 +58,14 @@ public class QualtricsServiceImpl implements QualtricsService {
         }
     }
 
+    private String getQualtricsApiEndpoint() {
+        return configRepository.findByType("QUALTRICS_API_ENDPOINT").get(0);
+    }
+
+    private String getApiKey() {
+        return configRepository.findByType("API_KEY").get(0);
+    }
+
     /**
      * Fetch completion status of required surveys
      * See https://api.qualtrics.com/6b00592b9c013-start-response-export for details of API
@@ -70,7 +79,7 @@ public class QualtricsServiceImpl implements QualtricsService {
     public Set<String> getSurveyCompletions(String surveyId) throws InternalServerException {
         try {
             URL url = UriComponentsBuilder
-                    .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses")
+                    .fromUriString(getQualtricsApiEndpoint() + "/surveys/" + surveyId + "/export-responses")
                     .build().toUri().toURL();
             String response = apiProcess(url, QualtricsBody);
             JSONObject resultObj = new JSONObject(response).getJSONObject("result");
@@ -108,7 +117,7 @@ public class QualtricsServiceImpl implements QualtricsService {
      */
     private ExportResponse getExportStatus(String surveyId, String progressId) throws IOException, JSONException {
         URL url = UriComponentsBuilder
-                .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses/" + progressId)
+                .fromUriString(getQualtricsApiEndpoint() + "/surveys/" + surveyId + "/export-responses/" + progressId)
                 .build().toUri().toURL();
         String response = apiProcess(url, "");
         //A more elegant way is to use the ObjectMapper, but initializing it is very costly
@@ -123,7 +132,7 @@ public class QualtricsServiceImpl implements QualtricsService {
         LOGGER.info("FileId = " + fileId);
         Set<String> completedEmails = new HashSet<>();
         URL url = UriComponentsBuilder
-                .fromUriString(QUALTRICS_API_ENDPOINT + "/surveys/" + surveyId + "/export-responses/" + fileId + "/file")
+                .fromUriString(getQualtricsApiEndpoint() + "/surveys/" + surveyId + "/export-responses/" + fileId + "/file")
                 .build().toUri().toURL();
         String response = apiProcess(url, "");
         JSONArray responseList = new JSONObject(response).getJSONArray("responses");
@@ -141,7 +150,7 @@ public class QualtricsServiceImpl implements QualtricsService {
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
-        builder.addHeader("X-API-TOKEN", API_KEY);
+        builder.addHeader("X-API-TOKEN", getApiKey());
         if (body.length() > 0) {
             builder.post(RequestBody.create(body, JSON));
         }

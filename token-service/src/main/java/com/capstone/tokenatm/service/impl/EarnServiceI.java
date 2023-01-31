@@ -41,21 +41,9 @@ public class EarnServiceI implements EarnService {
     @Autowired
     EmailService emailService;
 
-    private static final List<String> INSTRUCTOR_EMAILS = Arrays.asList("chingyal@uci.edu");
     //Canvas API settings
     //TODO: The API Endpoint and Bearer token is only used for testing. Please change to UCI endpoint and actual tokens in prod
-    //Bearer Token for dummy canvas endpoint
-    private static final String BEARER_TOKEN = "7~sKb3Kq7M9EjSgDtMhugxCEs5oD76pbJgBWAFScBliSi7Iin8QubiBHEBlrWfYunG";
-    //Testing endpoint for Canvas
-    private static final String CANVAS_API_ENDPOINT = "https://canvas.instructure.com/api/v1";
 
-    private static final String QUALTRICS_API_ENDPOINT = "https://iad1.qualtrics.com/API/v3";
-
-    //Course Id
-    private static final int COURSE_ID = 3737737;
-
-    //List of Quizzes in the first module (which needs over 70% average to earn the initial 2 tokens)
-    private static List<String> tokenQuizIds = Arrays.asList("12427623", "12476618", "12476695");
 
     public static final MediaType JSON
             = MediaType.get("application/json; charset=utf-8");
@@ -64,13 +52,6 @@ public class EarnServiceI implements EarnService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(EarnService.class);
 
-    //Map of assignments that are can be resubmitted
-    private static Map<String, String> resubmissionsMap = new HashMap<>();
-    static {
-        resubmissionsMap.put("33741790", "33811609");
-        resubmissionsMap.put("33741750", "33811823");
-        resubmissionsMap.put("33741783", "33811829");
-    }
 
     //List of surveys
 
@@ -116,6 +97,7 @@ public class EarnServiceI implements EarnService {
     @Override
     public Map<String, Double> getStudentTokenGrades() throws IOException, JSONException {
         Map<String, Double> averageQuizScores = new HashMap<>();
+        List<String> tokenQuizIds = getTokenQuizIds();
         for (String quizId : tokenQuizIds) {
             Map<String, Double> quizScores = getStudentQuizScores(quizId);
             quizScores.entrySet().forEach(e -> {
@@ -295,7 +277,7 @@ public class EarnServiceI implements EarnService {
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
-        builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
+        builder.addHeader("Authorization", "Bearer " + getBearerToken());
         if (body.length() > 0) {
             builder.post(RequestBody.create(body, JSON));
         }
@@ -309,7 +291,7 @@ public class EarnServiceI implements EarnService {
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
-        builder.addHeader("Authorization", "Bearer " + BEARER_TOKEN);
+        builder.addHeader("Authorization", "Bearer " + getBearerToken());
         builder.method("POST",body);
         Request request = builder.build();
         try (Response response = client.newCall(request).execute()) {
@@ -319,13 +301,42 @@ public class EarnServiceI implements EarnService {
         }
         return 400;
     }
+    private String getCanvasApiEndpoint() {
+        return configRepository.findByType("CANVAS_API_ENDPOINT").get(0);
+    }
+
+    private String getCourseID() {
+        return configRepository.findByType("COURSE_ID").get(0);
+    }
+
+    private List<String> getTokenQuizIds() {
+        return configRepository.findByType("tokenQuizIds");
+    }
+
+    private List<String> getInstructorEmails() {
+        return configRepository.findByType("INSTRUCTOR_EMAILS");
+    }
+
+    private String getBearerToken() {
+        return configRepository.findByType("BEARER_TOKEN").get(0);
+    }
+
+    private Map<String, String> getResubmissionsMap() {
+        List<String> resubmissions = configRepository.findByType("resubmissionsMap");
+        Map<String, String> resubmissionsMap = new HashMap<>();
+        for (String resubmission : resubmissions) {
+            String[] parts = resubmission.split("/");
+            resubmissionsMap.put(parts[0], parts[1]);
+        }
+        return resubmissionsMap;
+    }
 
     private Map<String, Student> getStudents() throws IOException, JSONException {
         int page = 1;
         Map<String, Student> studentMap = new HashMap<>();
         while (true) {
             URL url = UriComponentsBuilder
-                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/users")
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/users")
                     .queryParam("page", page)
                     .queryParam("per_page", PER_PAGE)
                     .build().toUri().toURL();
@@ -353,7 +364,7 @@ public class EarnServiceI implements EarnService {
         HashMap<Object, Object> students_data = new HashMap<>();
 
         while (true) {
-            URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/students/submissions?exclude_response_fields%5B%5D=preview_url&grouped=1&response_fields%5B%5D=assignment_id&response_fields%5B%5D=attachments&response_fields%5B%5D=attempt&response_fields%5B%5D=cached_due_date&response_fields%5B%5D=entered_grade&response_fields%5B%5D=entered_score&response_fields%5B%5D=excused&response_fields%5B%5D=grade&response_fields%5B%5D=grade_matches_current_submission&response_fields%5B%5D=grading_period_id&response_fields%5B%5D=id&response_fields%5B%5D=late&response_fields%5B%5D=late_policy_status&response_fields%5B%5D=missing&response_fields%5B%5D=points_deducted&response_fields%5B%5D=posted_at&response_fields%5B%5D=redo_request&response_fields%5B%5D=score&response_fields%5B%5D=seconds_late&response_fields%5B%5D=submission_type&response_fields%5B%5D=submitted_at&response_fields%5B%5D=url&response_fields%5B%5D=user_id&response_fields%5B%5D=workflow_state&student_ids%5B%5D="
+            URL url = new URL(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/students/submissions?exclude_response_fields%5B%5D=preview_url&grouped=1&response_fields%5B%5D=assignment_id&response_fields%5B%5D=attachments&response_fields%5B%5D=attempt&response_fields%5B%5D=cached_due_date&response_fields%5B%5D=entered_grade&response_fields%5B%5D=entered_score&response_fields%5B%5D=excused&response_fields%5B%5D=grade&response_fields%5B%5D=grade_matches_current_submission&response_fields%5B%5D=grading_period_id&response_fields%5B%5D=id&response_fields%5B%5D=late&response_fields%5B%5D=late_policy_status&response_fields%5B%5D=missing&response_fields%5B%5D=points_deducted&response_fields%5B%5D=posted_at&response_fields%5B%5D=redo_request&response_fields%5B%5D=score&response_fields%5B%5D=seconds_late&response_fields%5B%5D=submission_type&response_fields%5B%5D=submitted_at&response_fields%5B%5D=url&response_fields%5B%5D=user_id&response_fields%5B%5D=workflow_state&student_ids%5B%5D="
                     + users_id + "&page=" + page + "&per_page=" + PER_PAGE);
             String response = apiProcess(url, "");
             JSONArray result = new JSONArray(response);
@@ -382,7 +393,7 @@ public class EarnServiceI implements EarnService {
         Map<String, Object> result = new HashMap<>();
         ArrayList<HashMap<Object, Object>> course_data = new ArrayList<>();
         while (true) {
-            URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignment_groups?exclude_assignment_submission_types%5B%5D=wiki_page&exclude_response_fields%5B%5D=description&exclude_response_fields%5B%5D=in_closed_grading_period&exclude_response_fields%5B%5D=needs_grading_count&exclude_response_fields%5B%5D=rubric&include%5B%5D=assignment_group_id&include%5B%5D=assignment_visibility&include%5B%5D=assignments&include%5B%5D=grades_published&include%5B%5D=post_manually&include%5B%5D=module_ids&override_assignment_dates=false"
+            URL url = new URL(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignment_groups?exclude_assignment_submission_types%5B%5D=wiki_page&exclude_response_fields%5B%5D=description&exclude_response_fields%5B%5D=in_closed_grading_period&exclude_response_fields%5B%5D=needs_grading_count&exclude_response_fields%5B%5D=rubric&include%5B%5D=assignment_group_id&include%5B%5D=assignment_visibility&include%5B%5D=assignments&include%5B%5D=grades_published&include%5B%5D=post_manually&include%5B%5D=module_ids&override_assignment_dates=false"
                     + "&page=" + page + "&per_page=" + PER_PAGE);
             JSONArray response = new JSONArray(apiProcess(url, ""));
             for (int i = 0; i < response.length(); i++) {
@@ -448,6 +459,7 @@ public class EarnServiceI implements EarnService {
     private void sendNotificationEmail(Student student, Assignment assignment, int cost) {
         String message = String.format("On %s %s (ID: %s) successfully requested to use %d tokens for resubmission of %s (ID: %s)",
                 new Date(), student.getName(), student.getId(), cost, assignment.getName(), assignment.getId());
+        List<String> INSTRUCTOR_EMAILS = configRepository.findByType("INSTRUCTOR_EMAILS");
         for (String email : INSTRUCTOR_EMAILS) {
             emailService.sendSimpleMessage(email, "Usage Update in Token ATM", message);
         }
@@ -467,9 +479,10 @@ public class EarnServiceI implements EarnService {
             String title = "Resubmission";
             Date due =  new Date(current_time.getTime() + 24*60*60*1000);
 
+            Map<String, String> resubmissionsMap = getResubmissionsMap();
             String resubmission_id = resubmissionsMap.get(assignment_id);
             URL url = UriComponentsBuilder
-                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + resubmission_id + "/overrides")
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + resubmission_id + "/overrides")
                     .build().toUri().toURL();
             RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
                     .addFormDataPart("assignment_override[student_ids][]",user_id)
@@ -512,7 +525,7 @@ public class EarnServiceI implements EarnService {
 
         while (true) {
             String users_id = students.entrySet().stream().map(e -> "&student_ids%5B%5D=" + e.getValue().getId()).collect(Collectors.joining(""));
-            URL url = new URL(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/quizzes/" + quizId +
+            URL url = new URL(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/quizzes/" + quizId +
                     "/submissions?exclude_response_fields%5B%5D=preview_url&grouped=1&response_fields%5B%5D=assignment_id&response_fields%5B%5D=attachments&response_fields%5B%5D=attempt&response_fields%5B%5D=cached_due_date&response_fields%5B%5D=entered_grade&response_fields%5B%5D=entered_score&response_fields%5B%5D=excused&response_fields%5B%5D=grade&response_fields%5B%5D=grade_matches_current_submission&response_fields%5B%5D=grading_period_id&response_fields%5B%5D=id&response_fields%5B%5D=late&response_fields%5B%5D=late_policy_status&response_fields%5B%5D=missing&response_fields%5B%5D=points_deducted&response_fields%5B%5D=posted_at&response_fields%5B%5D=redo_request&response_fields%5B%5D=score&response_fields%5B%5D=seconds_late&response_fields%5B%5D=submission_type&response_fields%5B%5D=submitted_at&response_fields%5B%5D=url&response_fields%5B%5D=user_id&response_fields%5B%5D=workflow_state&student_ids%5B%5D="
                     + users_id + "&page=" + page + "&per_page=" + PER_PAGE);
             String response = apiProcess(url, "");
@@ -537,6 +550,7 @@ public class EarnServiceI implements EarnService {
     public List<AssignmentStatus> getAssignmentStatuses(String user_id) {
         LOGGER.info("Fetching assignment statuses for " + user_id);
         List<AssignmentStatus> assignmentStatuses = new ArrayList<>();
+        Map<String, String> resubmissionsMap = getResubmissionsMap();
         resubmissionsMap.entrySet().stream().forEach(e -> {
             String assignmentId = e.getKey();
             String resubmissionId = e.getValue();
@@ -563,7 +577,7 @@ public class EarnServiceI implements EarnService {
 
         while (true) {
             URL url = UriComponentsBuilder
-                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignmentId + "/submissions")
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignmentId + "/submissions")
                     .queryParam("page", page)
                     .queryParam("per_page", PER_PAGE)
                     .build().toUri().toURL();
@@ -620,7 +634,7 @@ public class EarnServiceI implements EarnService {
     }
 
     private Assignment fetchAssignment(String assignmentId) throws IOException, JSONException {
-        URL url = UriComponentsBuilder.fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignmentId)
+        URL url = UriComponentsBuilder.fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignmentId)
                 .build().toUri().toURL();
         String response = apiProcess(url, "");
         JSONObject responseObj = new JSONObject(response);
