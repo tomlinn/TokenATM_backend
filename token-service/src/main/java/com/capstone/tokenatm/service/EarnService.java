@@ -4,6 +4,7 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
+import com.capstone.tokenatm.service.Response.CancelTokenResponse;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
@@ -31,6 +32,8 @@ public interface EarnService {
     Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException;
 
     UseTokenResponse useToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException;
+
+    CancelTokenResponse cancelToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException;
 
     List<AssignmentStatus> getAssignmentStatuses(String user_id) throws JSONException, IOException;
 

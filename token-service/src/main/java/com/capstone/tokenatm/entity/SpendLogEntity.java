@@ -15,6 +15,7 @@ public class SpendLogEntity {
 
 	private String user_name;
 
+	private String note;
 	public String getUser_name() {
 		return user_name;
 	}
@@ -76,5 +77,14 @@ public class SpendLogEntity {
 	public Date getTimestamp() {
 		return this.timestamp;
 	}
+
+	public void setNote(String note) {
+		this.note = note;
+	}
+
+	public String getNote() {
+		return this.note;
+	}
+
 
 }

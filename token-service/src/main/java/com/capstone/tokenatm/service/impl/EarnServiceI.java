@@ -1,6 +1,6 @@
 package com.capstone.tokenatm.service.impl;
 
-import com.capstone.tokenatm.entity.ConfigEntity;
+import com.alibaba.fastjson.serializer.JSONSerializer;
 import com.capstone.tokenatm.entity.SpendLogEntity;
 import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
@@ -10,9 +10,12 @@ import com.capstone.tokenatm.service.Beans.Assignment;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
 import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Beans.Student;
+import com.capstone.tokenatm.service.Response.CancelTokenResponse;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONArray;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
+import org.springframework.boot.json.GsonJsonParser;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.concurrent.ConcurrentTaskScheduler;
@@ -148,10 +152,10 @@ public class EarnServiceI implements EarnService {
         tokenRepository.save(entity);
 
         //Generate token use log
-        logRepository.save(createLog(user_id, student.getName(), add_count >= 0 ? "earn" : "spend", add_count, source));
+        logRepository.save(createLog(user_id, student.getName(), add_count >= 0 ? "earn" : "spend", add_count, source,""));
     }
 
-    private SpendLogEntity createLog(String user_id, String user_name, String type, Integer token_count, String source) {
+    private SpendLogEntity createLog(String user_id, String user_name, String type, Integer token_count, String source, String note) {
         SpendLogEntity n = new SpendLogEntity();
         n.setUser_id(user_id);
         n.setUser_name(user_name);
@@ -159,6 +163,7 @@ public class EarnServiceI implements EarnService {
         n.setTokenCount(token_count);
         n.setSourcee(source);
         n.setTimestamp(new Date());
+        n.setNote(note);
         return n;
     }
 
@@ -286,13 +291,25 @@ public class EarnServiceI implements EarnService {
             return response.body().string();
         }
     }
-    private Integer apiProcess(URL url, RequestBody body) throws IOException {
+    private Response apiProcess(URL url, RequestBody body, String __) throws IOException {
         OkHttpClient client = new OkHttpClient();
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
         builder.addHeader("Authorization", "Bearer " + getBearerToken());
         builder.method("POST",body);
+        Request request = builder.build();
+        Response response = client.newCall(request).execute();
+        return response;
+    }
+
+    private Integer apiProcess(String method, URL url, RequestBody body) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+        Request.Builder builder = new Request.Builder()
+                .url(url)
+                .addHeader("Content-Type", "application/json");
+        builder.addHeader("Authorization", "Bearer " + getBearerToken());
+        builder.method(method, body);
         Request request = builder.build();
         try (Response response = client.newCall(request).execute()) {
             return response.code();
@@ -301,6 +318,7 @@ public class EarnServiceI implements EarnService {
         }
         return 400;
     }
+
     private String getCanvasApiEndpoint() {
         return configRepository.findByType("CANVAS_API_ENDPOINT").get(0);
     }
@@ -466,7 +484,7 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public UseTokenResponse useToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
+    public UseTokenResponse useToken(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
         if (!optional.isPresent()) {
             LOGGER.error("Error: Student " + user_id + " is not in current database");
@@ -480,9 +498,9 @@ public class EarnServiceI implements EarnService {
             Date due =  new Date(current_time.getTime() + 24*60*60*1000);
 
             Map<String, String> resubmissionsMap = getResubmissionsMap();
-            String resubmission_id = resubmissionsMap.get(assignment_id);
+            String assignment_id = resubmissionsMap.get(assignment);
             URL url = UriComponentsBuilder
-                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + resubmission_id + "/overrides")
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides")
                     .build().toUri().toURL();
             RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
                     .addFormDataPart("assignment_override[student_ids][]",user_id)
@@ -490,25 +508,66 @@ public class EarnServiceI implements EarnService {
                     .addFormDataPart("assignment_override[lock_at]",due.toString())
                     .build();
 
-            switch (apiProcess(url, body)) {
-                case 201:
-                    token_amount -= cost;
-                    entity.setToken_count(token_amount);
-                    entity.setTimestamp(current_time);
-                    tokenRepository.save(entity);
+            Response response = apiProcess(url, body, "");
+            if(response.code() == 201) {
+                String str_response = response.body().string();
+                String resubmissionId= new Gson().fromJson(str_response, JsonObject.class).get("id").getAsString();
+                token_amount -= cost;
+                entity.setToken_count(token_amount);
+                entity.setTimestamp(current_time);
+                tokenRepository.save(entity);
 
-                    Assignment resubmission = fetchAssignment(resubmission_id);
-                    Map<String, Student> studentMap = getStudents();
-                    logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend", cost, "Assignment: " + resubmission.getName()));
-                    sendNotificationEmail(studentMap.get(user_id), resubmission, cost);
-                    return new UseTokenResponse("success", "", token_amount);
-                case 400:
-                    return new UseTokenResponse("failed", "Student already requested resubmission", token_amount);
-                default:
-                    return new UseTokenResponse("failed", "Unable to update tokens", token_amount);
+                Assignment resubmission = fetchAssignment(assignment_id);
+                Map<String, Student> studentMap = getStudents();
+                logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend", cost, assignment, resubmissionId));
+                sendNotificationEmail(studentMap.get(user_id), resubmission, cost);
+                return new UseTokenResponse("success", "", token_amount);
+            } else {
+                return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
             }
         }
         return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
+    }
+
+    @Override
+    public CancelTokenResponse cancelToken(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
+        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
+        List<SpendLogEntity> optional2 = logRepository.findByUserIdAssignmentId(user_id, assignment, "spend");
+
+        if (!optional.isPresent()) {
+            LOGGER.error("Error: Student " + user_id + " is not in current database");
+            throw new BadRequestException("Student " + user_id + " is not in current database");
+        }
+        TokenCountEntity entity = optional.get();
+        SpendLogEntity entity2 = optional2.get(optional2.size()-1);
+        Integer token_amount = entity.getToken_count();
+        String resubmission_id = entity2.getNote();
+        Date current_time = new Date();
+        Map<String, String> resubmissionsMap = getResubmissionsMap();
+        String assignment_id = resubmissionsMap.get(assignment);
+
+        URL url = UriComponentsBuilder
+                .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides/" + resubmission_id)
+                .build().toUri().toURL();
+            RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                                                      .addFormDataPart("","")
+                                                      .build();
+
+        switch (apiProcess("DELETE", url, body)) {
+            case 200:
+                token_amount += cost;
+                entity.setToken_count(token_amount);
+                entity.setTimestamp(current_time);
+                tokenRepository.save(entity);
+
+                Map<String, Student> studentMap = getStudents();
+                logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "Cancel", cost, assignment, resubmission_id));
+                return new CancelTokenResponse("success to cancel the resubmission", "", token_amount);
+            case 400:
+                return new CancelTokenResponse("failed", "Student already requested resubmission", token_amount);
+            default:
+                return new CancelTokenResponse("failed", "Unable to update tokens", token_amount);
+        }
     }
     /**
      * Fetch grades of all students for a specific quiz
@@ -606,9 +665,12 @@ public class EarnServiceI implements EarnService {
                                 "overdue",
                                 -1);
                     }
-                    String status = StreamSupport.stream(
-                            logRepository.findByUserIdAssignmentId(user_id, "Assignment: " + resubmission.getName()).spliterator(), false).count() > 0 ?
-                            "requested" : "none";
+                    String status = "none";
+                    Integer spend_amount = logRepository.findByUserIdAssignmentId(user_id, assignmentId,"spend").size();
+                    Integer cancel_amount = logRepository.findByUserIdAssignmentId(user_id, assignmentId,"cancel").size();
+                    if (spend_amount > cancel_amount && spend_amount - cancel_amount == 1){
+                        status = "requested";
+                    }
                     return new AssignmentStatus(assignment.getName(),
                             assignment.getId(),
                             resubmission.getId(),
@@ -668,7 +730,7 @@ public class EarnServiceI implements EarnService {
             //Save manual update log
             Map<String, Student> students = getStudents();
             Student student = students.get(user_id);
-            logRepository.save(createLog(user_id, student.getName(), "N/A", tokenNum, "Manual Update"));
+            logRepository.save(createLog(user_id, student.getName(), "N/A", tokenNum, "Manual Update",""));
             return new UpdateTokenResponse("complete", tokenNum);
         } else {
             LOGGER.error("Error: Student " + user_id + " does not exist in database");

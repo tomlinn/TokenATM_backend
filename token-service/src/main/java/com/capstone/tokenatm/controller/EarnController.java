@@ -8,6 +8,7 @@ import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Request.RequestUserIdBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
+import com.capstone.tokenatm.service.Response.CancelTokenResponse;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
@@ -91,6 +92,11 @@ public class EarnController {
     @PostMapping(path="/use_token/{user_id}")
     public @ResponseBody UseTokenResponse useToken(@PathVariable String user_id, @RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
         return earnService.useToken(user_id, body.getAssignment_id(), body.getToken_count());
+    }
+
+    @DeleteMapping(path="/cancel_token/{user_id}")
+    public @ResponseBody CancelTokenResponse cancelToken(@PathVariable String user_id, @RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
+        return earnService.cancelToken(user_id, body.getAssignment_id(), body.getToken_count());
     }
 
     @PostMapping("/update")
