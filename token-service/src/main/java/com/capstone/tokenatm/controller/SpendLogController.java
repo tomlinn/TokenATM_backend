@@ -42,4 +42,10 @@ public class SpendLogController {
     public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@RequestBody RequestLogBody body) {
         return logRepository.findByUserName(body.getName());
     }
+
+    @GetMapping(path="/logs/{user_id}")
+    public @ResponseBody Iterable<SpendLogEntity> getLogsForStudent(@PathVariable String user_id){
+
+        return logRepository.findByUserId(user_id);
+    }
 }
