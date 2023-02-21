@@ -8,9 +8,11 @@ import com.capstone.tokenatm.service.LogRepository;
 import com.capstone.tokenatm.service.Request.RequestLogBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.RequestRepository;
+import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -36,19 +38,26 @@ public class RequestController {
     }
 
     @PostMapping("/requests/approve/{id}")
-    public RequestEntity approveRequest(@PathVariable Integer id) throws BadRequestException, JSONException, IOException {
+    public ResponseEntity<?> approveRequest(@PathVariable Integer id) throws JSONException, IOException, BadRequestException {
         Optional<RequestEntity> optional = requestRepository.findById(id);
         if (!optional.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Request with ID " + id + " not found");
+            throw new BadRequestException("Request with ID " + id + " not found");
         }
         RequestEntity request = optional.get();
-        request.setStatus("Approved");
-        request.setApproved(Boolean.TRUE);
-        requestRepository.save(request);
+        UseTokenResponse tokenResponse = earnService.useToken(request);
+        if (tokenResponse.getAssignment_id().equals("success")) {
+            request.setStatus("Approved");
+            request.setApproved(Boolean.TRUE);
+            requestRepository.save(request);
+        } else {
+            throw new BadRequestException(tokenResponse.getMessage());
+        }
+        return ResponseEntity.ok(request);
+    }
 
-        earnService.useToken(request);
-
-        return request;
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<?> handleBadRequestException(BadRequestException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
 
     @PostMapping("/requests/reject/{id}")

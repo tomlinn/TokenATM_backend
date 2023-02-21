@@ -492,35 +492,36 @@ public class EarnServiceI implements EarnService {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
         if (!optional.isPresent()) {
             LOGGER.error("Error: Student " + user_id + " is not in current database");
-            throw new BadRequestException("Student " + user_id + " is not in current database");
+            return new UseTokenResponse("failed","Student " + user_id + " is not in current database", -1);
         }
         TokenCountEntity entity = optional.get();
         Integer token_amount = entity.getToken_count();
 
-
-        if (token_amount >= cost) {
-            // Create a new request in the database with a 'pending' status
-            RequestEntity request = new RequestEntity();
-            request.setStudentId(user_id);
-            request.setAssignmentId(assignment);
-            request.setTokenCount(cost);
-            request.setStatus("Pending");
-            requestRepository.save(request);
-
-            // create a log
-            Map<String, Student> studentMap = getStudents();
-            logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend(pending)", cost, assignment, null));
-
-            // Update the token count in the database
-            token_amount -= cost;
-            entity.setToken_count(token_amount);
-            entity.setTimestamp(new Date());
-            tokenRepository.save(entity);
-
-            return new UseTokenResponse("success", "Request submitted for approval", token_amount);
+        if (token_amount < cost) {
+            LOGGER.error("Error: Student " + user_id + " doesn't have enough sufficient token");
+            return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
         }
 
-        return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
+        // Create a new request in the database with a 'pending' status
+        RequestEntity request = new RequestEntity();
+        request.setStudentId(user_id);
+        request.setAssignmentId(assignment);
+        request.setTokenCount(cost);
+        request.setStatus("Pending");
+        requestRepository.save(request);
+
+        // create a log
+        Map<String, Student> studentMap = getStudents();
+        logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend(pending)", cost, assignment, null));
+
+        // Update the token count in the database
+        token_amount -= cost;
+        entity.setToken_count(token_amount);
+        entity.setTimestamp(new Date());
+        tokenRepository.save(entity);
+
+        return new UseTokenResponse("success", "Request submitted for approval", token_amount);
+
     }
 
     @Override
@@ -529,7 +530,7 @@ public class EarnServiceI implements EarnService {
         String title = "Resubmission";
         Date due =  new Date(current_time.getTime() + 24*60*60*1000);
 
-        if (request.isApproved()) {
+        if (!request.isApproved()) {
             Map<String, String> resubmissionsMap = getResubmissionsMap();
             String assignment_id = resubmissionsMap.get(request.getAssignmentId());
             URL url = UriComponentsBuilder
@@ -546,15 +547,15 @@ public class EarnServiceI implements EarnService {
                 String str_response = response.body().string();
                 String resubmissionId = new Gson().fromJson(str_response, JsonObject.class).get("id").getAsString();
 
-                Assignment resubmission = fetchAssignment(assignment_id);
                 Map<String, Student> studentMap = getStudents();
                 logRepository.save(createLog(request.getStudentId(), studentMap.get(request.getStudentId()).getName(), "spend(approved)", request.getTokenCount(), request.getAssignmentId(), resubmissionId));
                 // sendNotificationEmail(studentMap.get(user_id), resubmission, cost);
                 return new UseTokenResponse("success", "", request.getTokenCount());
-
+            } else {
+                return new UseTokenResponse("failed", "Resubmission request is failed", 0);
             }
         }
-        return new UseTokenResponse("failed", "Insufficient token amount", 0);
+        return new UseTokenResponse("failed", "Request was already approved", 0);
     }
 
 
