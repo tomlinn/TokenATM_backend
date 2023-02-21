@@ -46,6 +46,8 @@ public class RequestController {
         request.setApproved(Boolean.TRUE);
         requestRepository.save(request);
 
+        earnService.useToken(request);
+
         return request;
     }
 

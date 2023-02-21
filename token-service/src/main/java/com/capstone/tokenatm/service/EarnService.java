@@ -1,5 +1,6 @@
 package com.capstone.tokenatm.service;
 
+import com.capstone.tokenatm.entity.RequestEntity;
 import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
@@ -32,6 +33,8 @@ public interface EarnService {
     Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException;
 
     UseTokenResponse useToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException;
+
+    UseTokenResponse useToken(RequestEntity request) throws IOException, BadRequestException, JSONException;
 
     CancelTokenResponse cancelToken(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException;
 
