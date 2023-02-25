@@ -8,6 +8,7 @@ import com.capstone.tokenatm.service.LogRepository;
 import com.capstone.tokenatm.service.Request.RequestLogBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.RequestRepository;
+import com.capstone.tokenatm.service.Response.RejectTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.configurationprocessor.json.JSONException;
@@ -61,14 +62,19 @@ public class RequestController {
     }
 
     @PostMapping("/requests/reject/{id}")
-    public RequestEntity rejectRequest(@PathVariable Integer id) {
+    public RequestEntity rejectRequest(@PathVariable Integer id) throws JSONException, IOException, BadRequestException {
         Optional<RequestEntity> optional = requestRepository.findById(id);
         if (!optional.isPresent()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Request with ID " + id + " not found");
         }
         RequestEntity request = optional.get();
-        request.setStatus("Rejected");
-        requestRepository.save(request);
+        RejectTokenResponse tokenResponse = earnService.reject_token_use(request);
+        if (tokenResponse.getAssignment_id().equals("success")) {
+            request.setStatus("Rejected");
+            requestRepository.save(request);
+        } else {
+            throw new BadRequestException(tokenResponse.getMessage());
+        }
         return request;
     }
 }

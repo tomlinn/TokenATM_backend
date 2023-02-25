@@ -11,6 +11,7 @@ import com.capstone.tokenatm.service.Beans.Assignment;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
 import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Beans.Student;
+import com.capstone.tokenatm.service.Response.RejectTokenResponse;
 import com.capstone.tokenatm.service.Response.CancelTokenResponse;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
@@ -557,7 +558,52 @@ public class EarnServiceI implements EarnService {
         }
         return new UseTokenResponse("failed", "Request was already approved", 0);
     }
+    @Override
+    public RejectTokenResponse reject_token_use(RequestEntity request) throws JSONException, IOException {
+        // Find the request for the given student ID and assignment
+        Optional<RequestEntity> optionalRequest = requestRepository.findById(request.getId());
+        RequestEntity dbRequest = optionalRequest.get();
 
+        // check request id
+        if (!optionalRequest.isPresent()) {
+            LOGGER.error("Error: Request not found for id " + request.getId());
+            return new RejectTokenResponse("failed", "Request not found for id " + request.getId(), 0);
+        }
+        // check student id
+        Optional<TokenCountEntity> optionalTokenCount = tokenRepository.findById(dbRequest.getStudentId());
+        if (!optionalTokenCount.isPresent()) {
+            LOGGER.error("Error: Student " + dbRequest.getStudentId() + " is not in current database");
+            return new RejectTokenResponse("failed", "Student " + dbRequest.getStudentId() + " is not in current database", 0);
+        }
+        // Check if the request is already cancelled or rejected
+        if (dbRequest.getStatus().equals("Cancelled")) {
+            LOGGER.error("Error: Request has already been cancelled");
+            return new RejectTokenResponse("failed", "Request has already been cancelled", 0);
+        } else if (dbRequest.getStatus().equals("Rejected")) {
+            LOGGER.error("Error: Request has already been rejected");
+            return new RejectTokenResponse("failed", "Request has already been rejected", 0);
+        } else if (dbRequest.getStatus().equals("Approved")) {
+            LOGGER.error("Error: Request has already been approved");
+            return new RejectTokenResponse("failed", "Request has already been approved", 0);
+        }
+
+        // Update the request status to 'Rejected'
+        dbRequest.setStatus("Rejected");
+        requestRepository.save(dbRequest);
+
+        // Update the token count in the database
+        TokenCountEntity tokenCount = optionalTokenCount.get();
+        Integer token_amount = tokenCount.getToken_count();
+        token_amount += dbRequest.getTokenCount();
+        tokenCount.setToken_count(token_amount);
+        tokenRepository.save(tokenCount);
+
+        // create a log
+        Map<String, Student> studentMap = getStudents();
+        logRepository.save(createLog(dbRequest.getStudentId(), studentMap.get(dbRequest.getStudentId()).getName(), "spend(rejected)", dbRequest.getTokenCount(), dbRequest.getAssignmentId(), null));
+
+        return new RejectTokenResponse("success", "Request rejected and token count updated", token_amount);
+    }
 
     @Override
     public CancelTokenResponse cancelToken(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {

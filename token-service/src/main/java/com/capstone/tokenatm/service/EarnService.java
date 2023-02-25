@@ -6,6 +6,7 @@ import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
 import com.capstone.tokenatm.service.Response.CancelTokenResponse;
+import com.capstone.tokenatm.service.Response.RejectTokenResponse;
 import com.capstone.tokenatm.service.Response.RequestUserIdResponse;
 import com.capstone.tokenatm.service.Response.UpdateTokenResponse;
 import com.capstone.tokenatm.service.Response.UseTokenResponse;
@@ -43,5 +44,7 @@ public interface EarnService {
     UpdateTokenResponse updateToken(String user_id, Integer tokenNum) throws JSONException, IOException;
 
     RequestUserIdResponse getUserIdFromEmail(String email) throws JSONException, IOException;
+
+    RejectTokenResponse reject_token_use(RequestEntity request) throws JSONException, IOException;
 }
 
