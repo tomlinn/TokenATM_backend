@@ -1,6 +1,6 @@
 package com.capstone.tokenatm.service.Response;
 
-public class CancelTokenResponse {
+public class RejectTokenResponse {
 
     private String assignment_id;
     private Integer token_amount;
@@ -31,7 +31,7 @@ public class CancelTokenResponse {
         this.token_amount = token_amount;
     }
 
-    public CancelTokenResponse(String assignment_id, String message, Integer token_amount) {
+    public RejectTokenResponse(String assignment_id, String message, Integer token_amount) {
         this.assignment_id = assignment_id;
         this.message = message;
         this.token_amount = token_amount;
