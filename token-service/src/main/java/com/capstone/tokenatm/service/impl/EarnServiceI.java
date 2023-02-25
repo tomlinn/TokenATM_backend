@@ -489,7 +489,7 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public UseTokenResponse useToken(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
+    public UseTokenResponse request_token_use(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
         if (!optional.isPresent()) {
             LOGGER.error("Error: Student " + user_id + " is not in current database");
@@ -526,7 +526,7 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public UseTokenResponse useToken(RequestEntity request) throws IOException, BadRequestException, JSONException {
+    public UseTokenResponse approve_token_use(RequestEntity request) throws IOException, BadRequestException, JSONException {
         Date current_time = new Date();
         String title = "Resubmission";
         Date due =  new Date(current_time.getTime() + 24*60*60*1000);
@@ -553,11 +553,24 @@ public class EarnServiceI implements EarnService {
                 // sendNotificationEmail(studentMap.get(user_id), resubmission, cost);
                 return new UseTokenResponse("success", "", request.getTokenCount());
             } else {
-                return new UseTokenResponse("failed", "Resubmission request is failed", 0);
+                return new UseTokenResponse("failed", "Request has already been approved", 0);
             }
         }
-        return new UseTokenResponse("failed", "Request was already approved", 0);
+        if (request.getStatus().equals("Cancelled")) {
+            LOGGER.error("Error: Request has already been cancelled");
+            return new UseTokenResponse("failed", "Request has already been cancelled", 0);
+        } else if (request.getStatus().equals("Rejected")) {
+            LOGGER.error("Error: Request has already been rejected");
+            return new UseTokenResponse("failed", "Request has already been rejected", 0);
+        } else if (request.getStatus().equals("Approved")) {
+            LOGGER.error("Error: Request has already been approved");
+            return new UseTokenResponse("failed", "Request has already been approved", 0);
+        }else {
+            LOGGER.error("Unknown Error");
+            return new UseTokenResponse("failed", "Unknown Error.", 0);
+        }
     }
+
     @Override
     public RejectTokenResponse reject_token_use(RequestEntity request) throws JSONException, IOException {
         // Find the request for the given student ID and assignment
@@ -606,45 +619,71 @@ public class EarnServiceI implements EarnService {
     }
 
     @Override
-    public CancelTokenResponse cancelToken(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
-        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
-        List<SpendLogEntity> optional2 = logRepository.findByUserIdAssignmentIdType(user_id, assignment, "spend");
-
-        if (!optional.isPresent()) {
+    public CancelTokenResponse cancel_token_use(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
+        // Check if user exists
+        Optional<TokenCountEntity> optionalTokenCount = tokenRepository.findById(user_id);
+        if (!optionalTokenCount.isPresent()) {
             LOGGER.error("Error: Student " + user_id + " is not in current database");
-            throw new BadRequestException("Student " + user_id + " is not in current database");
+            return new CancelTokenResponse("failed", "Student " + user_id + " is not in current database", 0);
         }
-        TokenCountEntity entity = optional.get();
-        SpendLogEntity entity2 = optional2.get(optional2.size()-1);
-        Integer token_amount = entity.getToken_count();
-        String resubmission_id = entity2.getNote();
+        // Find the request for the given student ID and assignment
+        List<RequestEntity> optionalRequest = requestRepository.findByStudentIdAndAssignmentIdOrderByIdDesc(user_id, assignment);
+        if (optionalRequest.isEmpty()) {
+            LOGGER.error("Error: Request not found for student " + user_id + " and assignment " + assignment);
+            return new CancelTokenResponse("failed", "Request not found for student " + user_id + " and assignment " + assignment, 0);
+        }
+        RequestEntity request = optionalRequest.get(0);
+
+        // Check if the request is already cancelled or rejected
+        if (request.getStatus().equals("Cancelled")) {
+            LOGGER.error("Error: Request has already been cancelled");
+            return new CancelTokenResponse("failed", "Request has already been cancelled", 0);
+        } else if (request.getStatus().equals("Rejected")) {
+            LOGGER.error("Error: Request has already been rejected");
+            return new CancelTokenResponse("failed", "Request has already been rejected", 0);
+        }
         Date current_time = new Date();
-        Map<String, String> resubmissionsMap = getResubmissionsMap();
-        String assignment_id = resubmissionsMap.get(assignment);
+        if (request.getStatus().equals("Approved")) {
+            List<SpendLogEntity> optional2 = logRepository.findByUserIdAssignmentIdType(user_id, assignment, "spend(approved)");
+            SpendLogEntity entity2 = optional2.get(0);
+            String resubmission_id = entity2.getNote();
+            Map<String, String> resubmissionsMap = getResubmissionsMap();
+            String assignment_id = resubmissionsMap.get(assignment);
 
-        URL url = UriComponentsBuilder
-                .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides/" + resubmission_id)
-                .build().toUri().toURL();
+            URL url = UriComponentsBuilder
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides/" + resubmission_id)
+                    .build().toUri().toURL();
             RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
-                                                      .addFormDataPart("","")
-                                                      .build();
+                    .addFormDataPart("", "")
+                    .build();
 
-        switch (apiProcess("DELETE", url, body)) {
-            case 200:
-                token_amount += cost;
-                entity.setToken_count(token_amount);
-                entity.setTimestamp(current_time);
-                tokenRepository.save(entity);
-
-                Map<String, Student> studentMap = getStudents();
-                logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "Cancel", cost, assignment, resubmission_id));
-                return new CancelTokenResponse("success to cancel the resubmission", "", token_amount);
-            case 400:
-                return new CancelTokenResponse("failed", "Student already requested resubmission", token_amount);
-            default:
-                return new CancelTokenResponse("failed", "Unable to update tokens", token_amount);
+            switch (apiProcess("DELETE", url, body)) {
+                case 200:
+                    break;
+                case 400:
+                    return new CancelTokenResponse("failed", "Student already requested resubmission", 0);
+                default:
+                    return new CancelTokenResponse("failed", "Unable to update tokens", 0);
+            }
         }
+        // Update the request status to 'Cancelled'
+        request.setStatus("Cancelled");
+        requestRepository.save(request);
+
+        // Update the token count in the database
+        TokenCountEntity tokenCount = optionalTokenCount.get();
+        Integer token_amount = tokenCount.getToken_count();
+        token_amount += request.getTokenCount();
+        tokenCount.setTimestamp(current_time);
+        tokenCount.setToken_count(token_amount);
+        tokenRepository.save(tokenCount);
+
+        // create a log
+        Map<String, Student> studentMap = getStudents();
+        logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend(cancel)", request.getTokenCount(), assignment, null));
+        return new CancelTokenResponse("success", "Request cancelled and token count updated", token_amount);
     }
+
     /**
      * Fetch grades of all students for a specific quiz
      *

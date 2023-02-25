@@ -89,14 +89,14 @@ public class EarnController {
      *     "cost": int
      * }
      */
-    @PostMapping(path="/use_token/{user_id}")
-    public @ResponseBody UseTokenResponse useToken(@PathVariable String user_id, @RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
-        return earnService.useToken(user_id, body.getAssignment_id(), body.getToken_count());
+    @PostMapping(path="/request")
+    public @ResponseBody UseTokenResponse useToken(@RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
+        return earnService.request_token_use(body.getUser_id(), body.getAssignment_id(), body.getToken_count());
     }
 
-    @DeleteMapping(path="/cancel_token/{user_id}")
-    public @ResponseBody CancelTokenResponse cancelToken(@PathVariable String user_id, @RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
-        return earnService.cancelToken(user_id, body.getAssignment_id(), body.getToken_count());
+    @DeleteMapping(path="/cancel")
+    public @ResponseBody CancelTokenResponse cancelToken(@RequestBody UseTokenBody body) throws IOException, BadRequestException, JSONException {
+        return earnService.cancel_token_use(body.getUser_id(), body.getAssignment_id(), body.getToken_count());
     }
 
     @PostMapping("/update")

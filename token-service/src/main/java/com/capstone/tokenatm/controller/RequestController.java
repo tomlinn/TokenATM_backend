@@ -45,7 +45,7 @@ public class RequestController {
             throw new BadRequestException("Request with ID " + id + " not found");
         }
         RequestEntity request = optional.get();
-        UseTokenResponse tokenResponse = earnService.useToken(request);
+        UseTokenResponse tokenResponse = earnService.approve_token_use(request);
         if (tokenResponse.getAssignment_id().equals("success")) {
             request.setStatus("Approved");
             request.setApproved(Boolean.TRUE);
