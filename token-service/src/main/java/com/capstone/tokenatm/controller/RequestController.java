@@ -34,7 +34,7 @@ public class RequestController {
 
     @GetMapping("/requests/pending")
     public List<RequestEntity> getPendingRequests() {
-        List<RequestEntity> requests = requestRepository.findByStatus("Pending");
+        List<RequestEntity> requests = requestRepository.findAllByOrderByIdDescStatusAsc();
         return requests;
     }
 

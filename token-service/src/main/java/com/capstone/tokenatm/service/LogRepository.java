@@ -14,7 +14,7 @@ public interface LogRepository extends CrudRepository<SpendLogEntity, Integer> {
     @Query("SELECT l from SpendLogEntity l WHERE l.user_id = ?1")
     Iterable<SpendLogEntity> findByUserId(String user_id);
 
-    @Query("SELECT l from SpendLogEntity l WHERE l.user_id = ?1 and l.source = ?2 and l.type = ?3")
+    @Query("SELECT l from SpendLogEntity l WHERE l.user_id = ?1 and l.source = ?2 and l.type = ?3 ORDER BY l.id DESC")
     List<SpendLogEntity> findByUserIdAssignmentIdType(String user_id, String assignment_id, String type);
 
     @Query("SELECT l from SpendLogEntity l WHERE l.user_id = ?1 and l.source = ?2")

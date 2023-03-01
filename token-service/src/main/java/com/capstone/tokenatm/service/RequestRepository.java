@@ -6,5 +6,6 @@ import org.springframework.data.repository.CrudRepository;
 import java.util.List;
 
 public interface RequestRepository extends CrudRepository<RequestEntity, Integer> {
-        List<RequestEntity> findByStatus(String status);
+        List<RequestEntity> findAllByOrderByIdDescStatusAsc();
+        List<RequestEntity> findByStudentIdAndAssignmentIdOrderByIdDesc(String user_id, String assignment);
     }
