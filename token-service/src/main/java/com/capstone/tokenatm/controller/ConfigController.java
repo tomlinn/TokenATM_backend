@@ -39,7 +39,17 @@ public class ConfigController {
         return configRepository.findByType(body.getName());
     }
     @PostMapping("/config/update")
-    public @ResponseBody UpdateConfigResponse updateToken(@RequestParam Integer id, @RequestParam String config_name) throws JSONException, IOException {
+    public @ResponseBody UpdateConfigResponse updateConfig(@RequestParam Integer id, @RequestParam String config_name) throws JSONException, IOException {
         return configService.updateConfigEntity(id, config_name);
+    }
+
+    @PostMapping("/config/add")
+    public @ResponseBody UpdateConfigResponse addConfig(@RequestParam String config_type, @RequestParam String config_name) throws JSONException, IOException {
+        return configService.addConfigEntity(config_type, config_name);
+    }
+
+    @PostMapping("/config/delete")
+    public @ResponseBody UpdateConfigResponse deleteToken(@RequestParam Integer id) throws JSONException, IOException {
+        return configService.deleteConfigEntity(id);
     }
 }
