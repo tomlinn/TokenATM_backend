@@ -197,7 +197,7 @@ public class EarnServiceI implements EarnService {
 
     public Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException {
         Iterable<SpendLogEntity> originalLogs = logRepository.findAll();
-        List<String> tokenSurveyIds = configRepository.findByType("qualtrics");
+        List<String> tokenSurveyIds = configRepository.findByType("qualtricsSurveyId");
         init();
         syncModule();
         for (String surveyId : tokenSurveyIds) {
@@ -285,7 +285,7 @@ public class EarnServiceI implements EarnService {
         init();
         ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
         TaskScheduler scheduler = new ConcurrentTaskScheduler(executorService);
-        List<String> tokenSurveyIds = configRepository.findByType("qualtrics");
+        List<String> tokenSurveyIds = configRepository.findByType("qualtricsSurveyId");
 
         //Schedule Module 1
         scheduler.schedule(() -> syncModule(), module_deadline);
@@ -354,7 +354,7 @@ public class EarnServiceI implements EarnService {
     }
 
     private String getCourseID() {
-        return configRepository.findByType("COURSE_ID").get(0);
+        return configRepository.findByType("CANVAS_COURSE_ID").get(0);
     }
 
     private List<String> getTokenQuizIds() {
@@ -366,7 +366,7 @@ public class EarnServiceI implements EarnService {
     }
 
     private String getBearerToken() {
-        return configRepository.findByType("BEARER_TOKEN").get(0);
+        return configRepository.findByType("CANVAS_BEARER_TOKEN").get(0);
     }
 
     private Map<String, String> getResubmissionsMap() {

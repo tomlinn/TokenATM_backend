@@ -63,7 +63,7 @@ public class QualtricsServiceImpl implements QualtricsService {
     }
 
     private String getApiKey() {
-        return configRepository.findByType("API_KEY").get(0);
+        return configRepository.findByType("QUALTRICS_API_KEY").get(0);
     }
 
     /**
