@@ -104,18 +104,41 @@ public class EarnServiceI implements EarnService {
      * @throws JSONException
      */
     @Override
-    public Map<String, Double> getStudentTokenGrades() throws IOException, JSONException {
-        Map<String, Double> averageQuizScores = new HashMap<>();
-        List<String> tokenQuizIds = getTokenQuizIds();
-        for (String quizId : tokenQuizIds) {
+    public Map<String, Map<String, Double>> getStudentTokenGrades() throws IOException, JSONException {
+        Map<String, Map<String, Double>> studentGroupScores = new HashMap<>();
+        List<String> tokenQuizzes = getTokenQuizIds();
+        for (String quiz : tokenQuizzes) {
+            String quizId = quiz.split("/")[0];
+            String quizGroup = quiz.split("/")[1];
             Map<String, Double> quizScores = getStudentQuizScores(quizId);
             quizScores.entrySet().forEach(e -> {
                 String userId = e.getKey();
-                averageQuizScores.put(userId, averageQuizScores.getOrDefault(userId, 0.0) + e.getValue());
+                Double score = e.getValue();
+                Map<String, Double> groupScores = studentGroupScores.getOrDefault(userId, new HashMap<>());
+                groupScores.put(quizGroup, groupScores.getOrDefault(quizGroup, 0.0) + score);
+                groupScores.put(quizGroup + "_count", groupScores.getOrDefault(quizGroup + "_count" , 0.0) + 1);
+                studentGroupScores.put(userId, groupScores);
             });
         }
-        averageQuizScores.entrySet().forEach(e -> e.setValue(e.getValue() / tokenQuizIds.size()));
-        return averageQuizScores;
+
+        Map<String, Map<String, Double>> groupStudentScores = new HashMap<>();
+        studentGroupScores.entrySet().forEach(e -> {
+            String userId = e.getKey();
+            Map<String, Double> groupScores = e.getValue();
+            groupScores.entrySet().forEach(g -> {
+                String group = g.getKey();
+                if (!group.endsWith("_count")){
+                    double totalScore = g.getValue();
+                    double count = groupScores.getOrDefault(group + "_count", 0.0);
+                    double averageScore = count > 0 ? totalScore / count : 0;
+                    // add data into groupStudentScores
+                    Map<String, Double> studentScores = groupStudentScores.getOrDefault(group, new HashMap<>());
+                    studentScores.put(userId, averageScore);
+                    groupStudentScores.put(group, studentScores);
+                }
+            });
+        });
+        return groupStudentScores;
     }
 
     public void init() throws JSONException, IOException {
@@ -212,29 +235,31 @@ public class EarnServiceI implements EarnService {
     }
 
     private void syncModule() {
-        Map<String, Double> quizGrades = null;
-        Map<String, Student> studentMap = null;
-        Set<String> usersToUpdate = new HashSet<>();//List of user_ids that should +2 tokens
-        System.out.println("Running Module 1");
+        List<String> groupBarCredit = configRepository.findByType("tokenQuiz(group/bar/credit)");
         try {
-            quizGrades = getStudentTokenGrades();
-            studentMap = getStudents();
-        } catch (IOException | JSONException e) {
-            e.printStackTrace();
-        }
+            Map<String, Student> studentMap = getStudents();
+            Map<String, Map<String, Double>> groupStudentScores = getStudentTokenGrades();
+            System.out.println("Running Module 1");
 
-        if (quizGrades != null && studentMap != null) {
-            for (Map.Entry<String, Double> entry : quizGrades.entrySet()) {
-                String user_id = String.valueOf(entry.getKey());
-                Double quiz_aver = Double.valueOf(entry.getValue());
-                if (quiz_aver >= 70.00) {
-                    usersToUpdate.add(user_id);
+            if (groupStudentScores != null && studentMap != null) {
+                for (String barGroup :groupBarCredit) {
+                    String group = barGroup.split("/")[0];
+                    Double bar = Double.valueOf(barGroup.split("/")[1]);
+                    Integer credit = Integer.valueOf(barGroup.split("/")[2]);
+                    Map<String, Double> studentScores = groupStudentScores.get(group);
+                    if (studentScores != null) {
+                        for (Map.Entry<String, Double> entry : studentScores.entrySet()) {
+                            String userId = entry.getKey();
+                            Double score = entry.getValue();
+                            if(score >= bar) {
+                                updateTokenEntity(studentMap, userId, credit, "group_"+group);
+                            }
+                        }
+                    }
                 }
             }
-
-            for (String user_id : usersToUpdate) {
-                updateTokenEntity(studentMap, user_id, 2, "Module 1");
-            }
+        } catch (IOException | JSONException e) {
+            e.printStackTrace();
         }
     }
 
@@ -333,7 +358,7 @@ public class EarnServiceI implements EarnService {
     }
 
     private List<String> getTokenQuizIds() {
-        return configRepository.findByType("tokenQuizIds");
+        return configRepository.findByType("tokenQuiz(quizId/group)");
     }
 
     private List<String> getInstructorEmails() {
@@ -345,7 +370,7 @@ public class EarnServiceI implements EarnService {
     }
 
     private Map<String, String> getResubmissionsMap() {
-        List<String> resubmissions = configRepository.findByType("resubmissionsMap");
+        List<String> resubmissions = configRepository.findByType("resubmissionsMap(ResubmissionId/AssignmentId)");
         Map<String, String> resubmissionsMap = new HashMap<>();
         for (String resubmission : resubmissions) {
             String[] parts = resubmission.split("/");

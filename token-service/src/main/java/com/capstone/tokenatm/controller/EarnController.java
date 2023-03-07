@@ -4,7 +4,6 @@ import com.capstone.tokenatm.entity.TokenCountEntity;
 import com.capstone.tokenatm.exceptions.BadRequestException;
 import com.capstone.tokenatm.exceptions.InternalServerException;
 import com.capstone.tokenatm.service.Beans.AssignmentStatus;
-import com.capstone.tokenatm.service.QualtricsService;
 import com.capstone.tokenatm.service.Request.RequestUserIdBody;
 import com.capstone.tokenatm.service.Request.UseTokenBody;
 import com.capstone.tokenatm.service.EarnService;
@@ -62,7 +61,7 @@ public class EarnController {
     }
 
     @GetMapping("/token_grades")
-    public Map<String, Double> getTokenGrades(
+    public Map<String, Map<String, Double>> getTokenGrades(
     ) throws InternalServerException {
         try {
             return earnService.getStudentTokenGrades();

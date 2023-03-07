@@ -23,7 +23,7 @@ public interface EarnService {
 
     Map<String, Object> getCourseData() throws IOException, JSONException;
 
-    Map<String, Double> getStudentTokenGrades() throws IOException, JSONException;
+    Map<String, Map<String, Double>> getStudentTokenGrades() throws IOException, JSONException;
 
     Iterable<TokenCountEntity> getAllStudentTokenCounts();
 
