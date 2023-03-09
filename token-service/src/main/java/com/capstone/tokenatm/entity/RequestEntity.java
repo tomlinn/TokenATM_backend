@@ -6,6 +6,7 @@ import javax.persistence.*;
 @Table(name = "Requests")
 public class RequestEntity {
 	private String studentId;
+	private String studentName;
 	private String assignmentId;
 	private int tokenCount;
 	private boolean isApproved;
@@ -36,6 +37,14 @@ public class RequestEntity {
 		this.studentId = studentId;
 	}
 
+	public void setStudentName(String studentName) {
+		this.studentName = studentName;
+	}
+
+
+	public String getStudentName() {
+		return this.studentName;
+	}
 	public String getAssignmentId() {
 		return this.assignmentId;
 	}
