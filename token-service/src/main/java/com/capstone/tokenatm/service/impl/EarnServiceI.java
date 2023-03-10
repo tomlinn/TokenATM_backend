@@ -33,6 +33,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Instant;
 import java.util.*;
@@ -752,15 +753,13 @@ public class EarnServiceI implements EarnService {
         LOGGER.info("Fetching assignment statuses for " + user_id);
         List<AssignmentStatus> assignmentStatuses = new ArrayList<>();
         Map<String, String> resubmissionsMap = getResubmissionsMap();
-        resubmissionsMap.entrySet().stream().forEach(e -> {
-            String assignmentId = e.getKey();
-            String resubmissionId = e.getValue();
-            try {
-                assignmentStatuses.add(getAssignmentStatusForStudent(user_id, assignmentId, resubmissionId));
-            } catch (IOException | JSONException ex) {
-                ex.printStackTrace();
-            }
-        });
+        try {
+            assignmentStatuses = getAssignmentsStatusForStudent(user_id, resubmissionsMap);
+        } catch (IOException | JSONException ex) {
+            ex.printStackTrace();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
         return assignmentStatuses;
     }
 
@@ -842,6 +841,66 @@ public class EarnServiceI implements EarnService {
                 -1);
     }
 
+    private List<AssignmentStatus> getAssignmentsStatusForStudent(String user_id, Map<String, String> resubmissionsMap) throws IOException, JSONException, URISyntaxException {
+        List<AssignmentStatus> assignmentStatuses = new ArrayList<>();
+        ArrayList<String> queries = new ArrayList<>();
+        queries.add("student_ids[]=" + user_id);
+        queries.add("include[]=assignment");
+        ArrayList<String> resubmissionIds = new ArrayList<>();
+
+        for (Map.Entry<String, String> entry : resubmissionsMap.entrySet()) {
+            String assignmentId = entry.getKey();
+            String resubmissionId = entry.getValue();
+            resubmissionIds.add(resubmissionId);
+            queries.add("assignment_ids[]=" + assignmentId);
+        }
+        URL url = UriComponentsBuilder.fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/students/submissions")
+                .queryParam(String.join("&", queries))
+                .build().toUri().toURL();
+
+        String response = apiProcess(url, "");
+        JSONArray resultArray = new JSONArray(response);
+        Map<String, Map<String, String>> resubmissionData = fetchResubmissions(resubmissionsMap);
+
+        for (int i = 0; i < resultArray.length(); i++) {
+            JSONObject submissionObj = resultArray.getJSONObject(i);
+            JSONObject assignmentObj = submissionObj.getJSONObject("assignment");
+            String assignmentId = assignmentObj.getString("id");
+            Double score = submissionObj.isNull("score") ? null : submissionObj.getDouble("score");
+            String assignmentName = assignmentObj.getString("name");
+            String assignmentDue = assignmentObj.getString("due_at");
+            Double assignmentMaxScore = assignmentObj.getDouble("points_possible");
+            String resubmissionId = resubmissionsMap.get(assignmentId);
+            String resubmissionDue = resubmissionData.get(resubmissionId).get("due_at");
+
+            //Doesn't have a grade yet or can't fetch grade
+            if (score == null) {
+                 assignmentStatuses.add(new AssignmentStatus(assignmentName, assignmentId, resubmissionId, assignmentDue, 0.0, assignmentMaxScore, "Not graded yet", -1));
+            } else {
+                //Grades released
+                int tokens_required = (int) (assignmentMaxScore - score);
+                String status = "none";
+                if (!resubmissionDue.equals("No Due Date") && Instant.now().isAfter(Instant.parse(resubmissionDue))) {
+                    assignmentStatuses.add(new AssignmentStatus(assignmentName, assignmentId, resubmissionId, resubmissionDue, score, assignmentMaxScore, "overdue", -1));
+                } else {
+                    List<SpendLogEntity> data = logRepository.findByUserIdAssignmentId(user_id, assignmentId);
+
+                    if (!data.isEmpty()) {
+                        String latestStatus = data.get(data.size() - 1).getType();
+                        if (latestStatus.equals("spend(approved)")) {
+                            status = "Approved";
+                        } else if (latestStatus.equals("spend(pending)")) {
+                            status = "Pending";
+                        }
+                    }
+                    assignmentStatuses.add(new AssignmentStatus(assignmentName, assignmentId, resubmissionId, resubmissionDue, score, assignmentMaxScore, status, tokens_required));
+                }
+            }
+        }
+        return assignmentStatuses;
+    }
+
+
     private Assignment fetchAssignment(String assignmentId) throws IOException, JSONException {
         URL url = UriComponentsBuilder.fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignmentId)
                 .build().toUri().toURL();
@@ -854,6 +913,29 @@ public class EarnServiceI implements EarnService {
         double pointsPossible = responseObj.getDouble("points_possible");
         String name = responseObj.getString("name");
         return new Assignment(assignmentId, name, dueAt, pointsPossible);
+    }
+
+    private Map<String, Map<String, String>> fetchResubmissions(Map<String, String> resubmissionsMap) throws IOException, JSONException, URISyntaxException {
+        Map<String, Map<String, String>> resubmissionsIdMap = new HashMap<>();
+
+        for (String assignmentId : resubmissionsMap.values()) {
+            resubmissionsIdMap.put(assignmentId, new HashMap<>());
+        }
+        String query = "assignment_ids[]=" + String.join("&assignment_ids[]=", resubmissionsMap.values());
+        URL url = new URL(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments?" + query);
+
+        String response = apiProcess(url, "");
+        JSONArray resultArray = new JSONArray(response);
+
+        for (int i = 0; i < resultArray.length(); i++) {
+            JSONObject submissionObj = resultArray.getJSONObject(i);
+            String ResubmissionId = submissionObj.getString("id");
+            Map<String, String> item = resubmissionsIdMap.get(ResubmissionId);
+            item.put("id", ResubmissionId);
+            item.put("due_at", submissionObj.getString("lock_at"));
+        }
+
+        return  resubmissionsIdMap;
     }
 
     @Override
