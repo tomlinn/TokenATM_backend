@@ -123,7 +123,9 @@ public class QualtricsServiceImpl implements QualtricsService {
         //A more elegant way is to use the ObjectMapper, but initializing it is very costly
         JSONObject resultObj = new JSONObject(response).getJSONObject("result");
         return new ExportResponse(
-                resultObj.getString("fileId"),
+                resultObj.getDouble("percentComplete") == 0
+                        ? ""
+                        : resultObj.getString("fileId"),
                 resultObj.getDouble("percentComplete"),
                 resultObj.getString("status"));
     }
@@ -155,6 +157,7 @@ public class QualtricsServiceImpl implements QualtricsService {
             builder.post(RequestBody.create(body, JSON));
         }
         Request request = builder.build();
+        System.out.println("Qualtrics API:" + url);
         try (Response response = client.newCall(request).execute()) {
             return response.body().string();
         }
