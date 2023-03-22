@@ -463,48 +463,6 @@ public class EarnServiceI implements EarnService {
         return result;
     }
 
-
-
-    //This is the version of updating the original assignment, currently not under use
-//    public UseTokenResponse useToken_OriginalAssignment(String user_id, String assignment_id, Integer cost) throws IOException, BadRequestException, JSONException {
-//        Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
-//        if (!optional.isPresent()) {
-//            LOGGER.error("Error: Student " + user_id + " is not in current database");
-//            throw new BadRequestException("Student " + user_id + " is not in current database");
-//        }
-//        TokenCountEntity entity = optional.get();
-//        Integer token_amount = entity.getToken_count();
-//        if (token_amount >= cost) {
-//            Date current_time = new Date();
-//            token_amount = token_amount - cost;
-//            String title = "Resubmission";
-//            Date due =  new Date(current_time.getTime() + 24*60*60*1000);
-//
-//            URL url = UriComponentsBuilder
-//                    .fromUriString(CANVAS_API_ENDPOINT + "/courses/" + COURSE_ID + "/assignments/" + assignment_id + "/overrides")
-//                    .build().toUri().toURL();
-//            RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
-//                                                          .addFormDataPart("assignment_override[student_ids][]",user_id)
-//                                                          .addFormDataPart("assignment_override[title]",title)
-//                                                          .addFormDataPart("assignment_override[lock_at]",due.toString())
-//                                                          .build();
-//
-//            switch (apiProcess(url, body, true)) {
-//                case 201:
-//                    entity.setToken_count(token_amount);
-//                    entity.setTimestamp(current_time);
-//                    tokenRepository.save(entity);
-//
-//                    Assignment assignment = fetchAssignment(assignment_id);
-//                    logRepository.save(createLog(user_id, "spend", cost, "Assignment: " + assignment.getName()));
-//                    return new UseTokenResponse("success", "", token_amount);
-//                default:
-//                    return new UseTokenResponse("failed", "Unable to update tokens", token_amount);
-//            }
-//        }
-//        return new UseTokenResponse("failed", "Insufficient token amount", token_amount);
-//    }
-
     private void sendNotificationEmail(Student student, Assignment assignment, int cost) {
         String message = String.format("On %s %s (ID: %s) successfully requested to use %d tokens for resubmission of %s (ID: %s)",
                 new Date(), student.getName(), student.getId(), cost, assignment.getName(), assignment.getId());
