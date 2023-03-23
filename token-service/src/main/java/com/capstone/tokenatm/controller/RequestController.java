@@ -30,6 +30,9 @@ public class RequestController {
     private RequestRepository requestRepository;
 
     @Autowired
+    private LogRepository LogRepository;
+
+    @Autowired
     EarnService earnService;
 
     @GetMapping("/requests/pending")
@@ -51,8 +54,10 @@ public class RequestController {
             request.setApproved(Boolean.TRUE);
             requestRepository.save(request);
         } else {
+            LogRepository.save(createLog("", "", "system", 0, "Failed to approve request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
             throw new BadRequestException(tokenResponse.getMessage());
         }
+        LogRepository.save(createLog("", "", "system", 0, "Approved request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
         return ResponseEntity.ok(request);
     }
 
@@ -73,8 +78,22 @@ public class RequestController {
             request.setStatus("Rejected");
             requestRepository.save(request);
         } else {
+            LogRepository.save(createLog("", "", "system", 0, "Failed to reject request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
             throw new BadRequestException(tokenResponse.getMessage());
         }
+        LogRepository.save(createLog("", "", "system", 0, "Rejected request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
         return request;
+    }
+
+    private SpendLogEntity createLog(String user_id, String user_name, String type, Integer token_count, String source, String note) {
+        SpendLogEntity n = new SpendLogEntity();
+        n.setUser_id(user_id);
+        n.setUser_name(user_name);
+        n.setType(type);
+        n.setTokenCount(token_count);
+        n.setSourcee(source);
+        n.setTimestamp(new Date());
+        n.setNote(note);
+        return n;
     }
 }
