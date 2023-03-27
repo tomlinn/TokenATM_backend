@@ -197,6 +197,7 @@ public class EarnServiceI implements EarnService {
     }
 
     public Iterable<TokenCountEntity> manualSyncTokens() throws JSONException, IOException {
+        logRepository.save(createLog("", "", "system", 0, "manualSyncTokens(start)",""));
         Iterable<SpendLogEntity> originalLogs = logRepository.findAll();
         List<String> tokenSurveyIds = configRepository.findByType("qualtricsSurveyId");
         init();
@@ -205,6 +206,7 @@ public class EarnServiceI implements EarnService {
             syncSurvey(surveyId);
         }
         syncLog(originalLogs);
+        logRepository.save(createLog("", "", "system", 0, "manualSyncTokens(end)",""));
         return tokenRepository.findAll();
     }
 
@@ -264,15 +266,16 @@ public class EarnServiceI implements EarnService {
         }
     }
 
-    private void syncLog(Iterable<SpendLogEntity> logs) {
+    private void syncLog(Iterable<SpendLogEntity> originalLogs) {
         try {
             Map<String, Student> studentMap = getStudents();
-            for (SpendLogEntity log : logs) {
+            for (SpendLogEntity log : originalLogs) {
                 String user_id = String.valueOf(log.getUserId());
                 Integer token_count = log.getTokenCount();
-                if (log.getType().equals("spend")) {
-                    System.out.println(user_id + " spend " + token_count + " tokens");
+                if (log.getType().startsWith("spend")) {
                     updateTokenEntity(studentMap, user_id, -token_count, log.getSource());
+                }else if (log.getType().startsWith("system")) {
+                    logRepository.save(log);
                 }
             }
         } catch (IOException | JSONException e) {
@@ -607,15 +610,19 @@ public class EarnServiceI implements EarnService {
     @Override
     public CancelTokenResponse cancel_token_use(String user_id, String assignment, Integer cost) throws IOException, BadRequestException, JSONException {
         // Check if user exists
+        Map<String, Student> studentMap = getStudents();
+        String studentName = studentMap.get(user_id).getName();
         Optional<TokenCountEntity> optionalTokenCount = tokenRepository.findById(user_id);
         if (!optionalTokenCount.isPresent()) {
             LOGGER.error("Error: Student " + user_id + " is not in current database");
+            logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
             return new CancelTokenResponse("failed", "Student " + user_id + " is not in current database", 0);
         }
         // Find the request for the given student ID and assignment
         List<RequestEntity> optionalRequest = requestRepository.findByStudentIdAndAssignmentIdOrderByIdDesc(user_id, assignment);
         if (optionalRequest.isEmpty()) {
             LOGGER.error("Error: Request not found for student " + user_id + " and assignment " + assignment);
+            logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
             return new CancelTokenResponse("failed", "Request not found for student " + user_id + " and assignment " + assignment, 0);
         }
         RequestEntity request = optionalRequest.get(0);
@@ -623,9 +630,11 @@ public class EarnServiceI implements EarnService {
         // Check if the request is already cancelled or rejected
         if (request.getStatus().equals("Cancelled")) {
             LOGGER.error("Error: Request has already been cancelled");
+            logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
             return new CancelTokenResponse("failed", "Request has already been cancelled", 0);
         } else if (request.getStatus().equals("Rejected")) {
             LOGGER.error("Error: Request has already been rejected");
+            logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
             return new CancelTokenResponse("failed", "Request has already been rejected", 0);
         }
         Date current_time = new Date();
@@ -647,8 +656,10 @@ public class EarnServiceI implements EarnService {
                 case 200:
                     break;
                 case 400:
+                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
                     return new CancelTokenResponse("failed", "Student already requested resubmission", 0);
                 default:
+                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
                     return new CancelTokenResponse("failed", "Unable to update tokens", 0);
             }
         }
@@ -665,8 +676,8 @@ public class EarnServiceI implements EarnService {
         tokenRepository.save(tokenCount);
 
         // create a log
-        Map<String, Student> studentMap = getStudents();
         logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend(cancel)", request.getTokenCount(), assignment, null));
+        logRepository.save(createLog("", "", "system", 0, "Cancelled request - " + studentName + "(" + user_id + ")",""));
         return new CancelTokenResponse("success", "Request cancelled and token count updated", token_amount);
     }
 
@@ -911,13 +922,14 @@ public class EarnServiceI implements EarnService {
         Optional<TokenCountEntity> optional = tokenRepository.findById(user_id);
         if (optional.isPresent()) {
             TokenCountEntity entity = optional.get();
+            Integer oriTokenNum = entity.getToken_count();
             entity.setToken_count(tokenNum);
             tokenRepository.save(entity);
 
             //Save manual update log
             Map<String, Student> students = getStudents();
             Student student = students.get(user_id);
-            logRepository.save(createLog(user_id, student.getName(), "N/A", tokenNum, "Manual Update",""));
+            logRepository.save(createLog(user_id, student.getName(), "system", tokenNum, "Manual Update Token Amount from "+ oriTokenNum +" to " + tokenNum,""));
             return new UpdateTokenResponse("complete", tokenNum);
         } else {
             LOGGER.error("Error: Student " + user_id + " does not exist in database");
