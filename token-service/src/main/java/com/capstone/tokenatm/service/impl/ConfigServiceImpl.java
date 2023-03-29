@@ -25,13 +25,15 @@ public class ConfigServiceImpl implements ConfigService {
     public UpdateConfigResponse updateConfigEntity(Integer id, String config_name) {
         Optional<ConfigEntity> optional = ConfigRepository.findById(id);
         ConfigEntity entity = null;
+        String oriConfigName = "";
         if (optional.isPresent()) {
             entity = optional.get();
+            oriConfigName = entity.getConfigName();
             entity.setConfigName(config_name);
             entity.setTimestamp(new Date());
         }
         ConfigRepository.save(entity);
-        LogRepository.save(createLog("", "", "system", 0, "update Config from (Name:"+ optional.get().getConfigName() +") to (Name:" + config_name + ")",""));
+        LogRepository.save(createLog("", "", "system", 0, "update Config from (Name:"+ oriConfigName +") to (Name:" + config_name + ")",""));
         return new UpdateConfigResponse( "Config entity updated successfully");
     }
 
