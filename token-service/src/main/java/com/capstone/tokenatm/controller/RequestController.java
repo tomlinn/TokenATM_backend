@@ -57,7 +57,7 @@ public class RequestController {
             LogRepository.save(createLog("", "", "system", 0, "Failed to approve request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
             throw new BadRequestException(tokenResponse.getMessage());
         }
-        LogRepository.save(createLog("", "", "system", 0, "Approved request - "+request.getStudentName()+"(" + request.getStudentId()+")",""));
+        LogRepository.save(createLog("", "", "system", 0, "Approved request - "+request.getStudentName()+"(" + request.getStudentId()+") - " + request.getAssignmentId(),""));
         return ResponseEntity.ok(request);
     }
 
