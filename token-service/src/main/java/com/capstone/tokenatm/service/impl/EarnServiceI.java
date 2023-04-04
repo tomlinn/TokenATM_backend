@@ -325,13 +325,15 @@ public class EarnServiceI implements EarnService {
             return response.body().string();
         }
     }
-    private Response apiProcess(URL url, RequestBody body, String __) throws IOException {
+    private Response apiProcess(String method, URL url, RequestBody body, String __) throws IOException {
         OkHttpClient client = new OkHttpClient();
         Request.Builder builder = new Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json");
         builder.addHeader("Authorization", "Bearer " + getBearerToken());
-        builder.method("POST",body);
+        if (method != "GET") {
+            builder.method(method, body);
+        }
         Request request = builder.build();
         Response response = client.newCall(request).execute();
         return response;
@@ -532,7 +534,7 @@ public class EarnServiceI implements EarnService {
                     .addFormDataPart("assignment_override[lock_at]", due.toString())
                     .build();
 
-            Response response = apiProcess(url, body, "");
+            Response response = apiProcess("POST", url, body, "");
             if (response.code() == 201) {
                 String str_response = response.body().string();
                 String resubmissionId = new Gson().fromJson(str_response, JsonObject.class).get("id").getAsString();
@@ -558,6 +560,63 @@ public class EarnServiceI implements EarnService {
             LOGGER.error("Unknown Error");
             return new UseTokenResponse("failed", "Unknown Error.", 0);
         }
+    }
+
+    @Override
+    public UseTokenResponse approve_all_token_use(List<RequestEntity> requests) throws IOException, BadRequestException, JSONException {
+        Date current_time = new Date();
+        String title = "Resubmission";
+        Date due =  new Date(current_time.getTime() + 24*60*60*1000);
+        Map<String, Student> studentMap = getStudents();
+        Map<String, List<String>> requestsByAssignment = new HashMap<>();
+        List<String> approvedRequests = new ArrayList<>();
+        for (RequestEntity request : requests) {
+            if (requestsByAssignment.containsKey(request.getAssignmentId())) {
+                requestsByAssignment.get(request.getAssignmentId()).add(request.getStudentId());
+            } else {
+                List<String> studentIds = new ArrayList<>();
+                studentIds.add(request.getStudentId());
+                requestsByAssignment.put(request.getAssignmentId(), studentIds);
+            }
+        }
+
+        for (Map.Entry<String, List<String>> entry : requestsByAssignment.entrySet()) {
+            String assignmentId = entry.getKey();
+            List<String> studentIds = entry.getValue();
+
+            Map<String, String> resubmissionsMap = getResubmissionsMap();
+            String assignment_id = resubmissionsMap.get(assignmentId);
+            URL url = UriComponentsBuilder
+                    .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides")
+                    .build().toUri().toURL();
+            MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                    .addFormDataPart("assignment_override[title]", title)
+                    .addFormDataPart("assignment_override[lock_at]", due.toString());
+
+            // Add each student ID to the request body
+            for (String studentId : studentIds) {
+                builder.addFormDataPart("assignment_override[student_ids][]", studentId);
+            }
+
+            RequestBody body = builder.build();
+            Response response = apiProcess("POST", url, body, "");
+            if (response.code() == 201) {
+                String str_response = response.body().string();
+                String resubmissionId = new Gson().fromJson(str_response, JsonObject.class).get("id").getAsString();
+                for (String studentId : studentIds) {
+                    logRepository.save(createLog(studentId, studentMap.get(studentId).getName(), "spend(approved)", studentMap.get(studentId).getTokenCount(), assignmentId, resubmissionId));
+                }
+                approvedRequests.add(assignmentId);
+            }
+        }
+        for (RequestEntity request : requests) {
+            if (approvedRequests.contains(request.getAssignmentId())) {
+                request.setStatus("Approved");
+                requestRepository.save(request);
+            }
+        }
+
+        return new UseTokenResponse("success", "", 1);
     }
 
     @Override
