@@ -703,27 +703,50 @@ public class EarnServiceI implements EarnService {
             String resubmission_id = entity2.getNote();
             Map<String, String> resubmissionsMap = getResubmissionsMap();
             String assignment_id = resubmissionsMap.get(assignment);
-
+            // Get user list from a specific resubmissionId
             URL url = UriComponentsBuilder
                     .fromUriString(getCanvasApiEndpoint() + "/courses/" + getCourseID() + "/assignments/" + assignment_id + "/overrides/" + resubmission_id)
                     .build().toUri().toURL();
-            RequestBody body = new MultipartBody.Builder().setType(MultipartBody.FORM)
-                    .addFormDataPart("", "")
-                    .build();
+            MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM)
+                    .addFormDataPart("", "");
+            Response response = apiProcess("GET", url, builder.build(), "");
+            String str_response = response.body().string();
+            JSONArray student_ids = (JSONArray) new JSONObject(str_response).get("student_ids");
 
-            switch (apiProcess("DELETE", url, body)) {
+            // remove target user and update the resubmission
+            Integer responseStatus = null;
+            if (student_ids != null && student_ids.length() > 1) {
+                for (int i = 0; i < student_ids.length(); i++) {
+                    String student_id = student_ids.getString(i);
+                    if (!user_id.equals(student_id)) {
+                        builder.addFormDataPart("assignment_override[student_ids][]", student_id);
+                    }
+                }
+                builder.addFormDataPart("assignment_override[title]", "Resubmission");
+                builder.addFormDataPart("assignment_override[lock_at]", new JSONObject(str_response).get("lock_at").toString());
+                responseStatus = apiProcess("PUT", url, builder.build());
+            } else {
+                responseStatus = apiProcess("DELETE", url, builder.build());
+            }
+
+            switch (responseStatus) {
                 case 200:
+                    // Update the request status to 'Cancelled'
+                    logRepository.save(createLog("", "", "system", 0, "Revoked request - " + studentName + "(" + user_id + ")",resubmission_id));
+                    request.setStatus("Revoked");
                     break;
                 case 400:
-                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
+                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",resubmission_id));
                     return new CancelTokenResponse("failed", "Student already requested resubmission", 0);
                 default:
-                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",""));
+                    logRepository.save(createLog("", "", "system", 0, "Failed to cancel request - " + studentName + "(" + user_id + ")",resubmission_id));
                     return new CancelTokenResponse("failed", "Unable to update tokens", 0);
             }
+        } else {
+            logRepository.save(createLog("", "", "system", 0, "Cancelled request - " + studentName + "(" + user_id + ")",""));
+            // Update the request status to 'Cancelled'
+            request.setStatus("Cancelled");
         }
-        // Update the request status to 'Cancelled'
-        request.setStatus("Cancelled");
         requestRepository.save(request);
 
         // Update the token count in the database
@@ -736,7 +759,6 @@ public class EarnServiceI implements EarnService {
 
         // create a log
         logRepository.save(createLog(user_id, studentMap.get(user_id).getName(), "spend(cancel)", request.getTokenCount(), assignment, null));
-        logRepository.save(createLog("", "", "system", 0, "Cancelled request - " + studentName + "(" + user_id + ")",""));
         return new CancelTokenResponse("success", "Request cancelled and token count updated", token_amount);
     }
 
@@ -903,7 +925,7 @@ public class EarnServiceI implements EarnService {
 
             //Doesn't have a grade yet or can't fetch grade
             if (score == null) {
-                 assignmentStatuses.add(new AssignmentStatus(assignmentName, assignmentId, resubmissionId, assignmentDue, 0.0, assignmentMaxScore, "Not graded yet", -1));
+                assignmentStatuses.add(new AssignmentStatus(assignmentName, assignmentId, resubmissionId, assignmentDue, 0.0, assignmentMaxScore, "Not graded yet", -1));
             } else {
                 //Grades released
                 int tokens_required = (int) (assignmentMaxScore - score);
